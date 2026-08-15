@@ -119,7 +119,7 @@ function deleteProfile(name) {
   saveProfiles(getProfiles().filter(n => n !== name));
   localStorage.removeItem(`kd-last-record-${name}`);
   Object.keys(localStorage).forEach(k => {
-    if (k.startsWith(`kd-best-${name}-`)) localStorage.removeItem(k);
+    if (k.startsWith(`kd-best-${name}-`) || k.startsWith(`kd-stats-${name}-`)) localStorage.removeItem(k);
   });
   renderProfileList();
 }
@@ -138,6 +138,97 @@ function showScreen(name) {
   if (name === 'subjects') {
     document.getElementById('profileWelcome').textContent = state.profile || '';
     renderLastRecord();
+  }
+  if (name === 'records') renderRecords();
+}
+
+function goToRecords() {
+  playClick();
+  showScreen('records');
+}
+
+/* ---------- 単元ごとの記録一覧 ---------- */
+const SUBJECT_ORDER = ['math', 'kokugo', 'science', 'social', 'english'];
+const GRADE_ORDER = ['g6', 'g7', 'g8', 'g9'];
+
+function getAllCatDefs() {
+  const defs = [];
+  SUBJECT_ORDER.forEach(subject => {
+    GRADE_ORDER.forEach(grade => {
+      if (subject === 'math') {
+        CATEGORIES[grade].forEach(cat => {
+          defs.push({ subject, grade, catId: cat.id, catName: cat.name });
+        });
+      } else {
+        defs.push({ subject, grade, catId: `${subject}_${grade}`, catName: CATEGORY_LABEL[subject] });
+      }
+    });
+  });
+  return defs;
+}
+
+function renderRecords() {
+  const wrap = document.getElementById('recordsList');
+  wrap.innerHTML = '';
+  if (!state.profile) return;
+
+  const defs = getAllCatDefs();
+  let totalAttempted = 0, totalCorrect = 0, anyData = false;
+
+  SUBJECT_ORDER.forEach(subject => {
+    const subjectDefs = defs.filter(d => d.subject === subject);
+    const rows = [];
+
+    GRADE_ORDER.forEach(grade => {
+      subjectDefs.filter(d => d.grade === grade).forEach(d => {
+        const raw = localStorage.getItem(`kd-stats-${state.profile}-${d.catId}`);
+        if (!raw) return;
+        let stats;
+        try { stats = JSON.parse(raw); } catch (e) { return; }
+        if (!stats || !stats.attempted) return;
+
+        anyData = true;
+        totalAttempted += stats.attempted;
+        totalCorrect += stats.correct;
+        const bestIdx = parseInt(localStorage.getItem(`kd-best-${state.profile}-${d.catId}`) || '-1');
+
+        rows.push({ grade, catName: d.catName, stats, bestIdx });
+      });
+    });
+
+    if (rows.length === 0) return;
+
+    const section = document.createElement('div');
+    section.className = 'record-section';
+    const heading = document.createElement('div');
+    heading.className = 'record-subject-heading';
+    heading.style.setProperty('--stripe', SUBJECT_STRIPE[subject]);
+    heading.textContent = SUBJECT_LABEL[subject];
+    section.appendChild(heading);
+
+    rows.forEach(r => {
+      const rate = Math.round((r.stats.correct / r.stats.attempted) * 100);
+      const row = document.createElement('div');
+      row.className = 'cat-card record-row';
+      row.innerHTML = `
+        <div class="cat-body">
+          <h3>${GRADE_LABEL[r.grade]}　${r.catName}</h3>
+          <span>累計 ${r.stats.correct} / ${r.stats.attempted} 問正解（正答率 ${rate}%）・挑戦回数 ${r.stats.sessions}回</span>
+        </div>
+        ${r.bestIdx >= 0 ? `<div class="cat-rank">${RANKS[r.bestIdx]}</div>` : ''}
+      `;
+      section.appendChild(row);
+    });
+
+    wrap.appendChild(section);
+  });
+
+  const summary = document.getElementById('recordsSummary');
+  if (!anyData) {
+    summary.textContent = 'まだ記録がありません。教科を選んでクイズに挑戦してみましょう。';
+  } else {
+    const rate = totalAttempted > 0 ? Math.round((totalCorrect / totalAttempted) * 100) : 0;
+    summary.textContent = `全体：累計 ${totalCorrect} / ${totalAttempted} 問正解（正答率 ${rate}%）`;
   }
 }
 
@@ -391,6 +482,19 @@ function finishQuiz() {
   if (!isReview) {
     const prevBest = parseInt(localStorage.getItem(`kd-best-${state.profile}-${state.catId}`) || '-1');
     if (rankIdx > prevBest) localStorage.setItem(`kd-best-${state.profile}-${state.catId}`, rankIdx);
+
+    // 単元ごとの累計正解数・挑戦数を記録
+    const statsKey = `kd-stats-${state.profile}-${state.catId}`;
+    let stats;
+    try {
+      stats = JSON.parse(localStorage.getItem(statsKey)) || { attempted: 0, correct: 0, sessions: 0 };
+    } catch (e) {
+      stats = { attempted: 0, correct: 0, sessions: 0 };
+    }
+    stats.attempted = (stats.attempted || 0) + state.total;
+    stats.correct = (stats.correct || 0) + state.correctCount;
+    stats.sessions = (stats.sessions || 0) + 1;
+    localStorage.setItem(statsKey, JSON.stringify(stats));
   }
 
   const today = new Date();

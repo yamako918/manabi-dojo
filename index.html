@@ -91,6 +91,24 @@
   }
   .last-record b{ color:var(--ink); }
 
+  .records-link{
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    background:var(--card); border:1px solid rgba(31,58,95,0.15);
+    border-radius:10px; padding:11px 14px; font-size:13.5px; color:var(--ink);
+    cursor:pointer; font-family:inherit; box-shadow:var(--shadow);
+  }
+  .records-summary{
+    font-size:12.5px; color:var(--ink-soft); text-align:center;
+    background:rgba(31,58,95,0.05); border-radius:8px; padding:10px 12px;
+  }
+  .record-section{ display:flex; flex-direction:column; gap:8px; }
+  .record-subject-heading{
+    font-size:13px; font-weight:700; color:var(--ink);
+    padding-left:10px; border-left:5px solid var(--stripe,var(--ink));
+    margin-top:6px;
+  }
+  .record-row .cat-body span{ line-height:1.6; }
+
   .grade-card{
     position:relative; background:var(--card); border-radius:14px; padding:16px 18px;
     box-shadow:var(--shadow); border-left:8px solid var(--stripe,var(--ink));
@@ -233,6 +251,7 @@
       <button class="switch-link" onclick="playClick();showScreen('profile')">プロフィールを切り替える</button>
     </div>
     <div class="last-record" id="lastRecord" style="display:none;"></div>
+    <button class="records-link" onclick="goToRecords()">📊 単元ごとの記録をみる</button>
 
     <div class="grade-card" style="--stripe:#1F3A5F;" onclick="selectSubject('math')">
       <div class="kanji">算</div>
@@ -260,6 +279,13 @@
       <p>単語・文法の一問一答</p>
     </div>
     <div class="footnote">1回10問・全問終わると段位認定証がもらえます</div>
+  </div>
+
+  <!-- RECORDS: 単元ごとの記録一覧 -->
+  <div class="screen" id="screen-records">
+    <button class="backbtn" onclick="playClick();showScreen('subjects')">もどる</button>
+    <div class="records-summary" id="recordsSummary"></div>
+    <div id="recordsList"></div>
   </div>
 
   <!-- GRADE: 学年選択 -->
