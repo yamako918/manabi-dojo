@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>まなび道場</title>
+<meta name="theme-color" content="#1F3A5F">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="まなび道場">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@400;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FAF8F0;
+    --grid:rgba(31,58,95,0.09);
+    --ink:#1F3A5F;
+    --ink-soft:#4A6483;
+    --red:#D63447;
+    --gold:#C98A2C;
+    --green:#3F7A56;
+    --card:#FFFFFF;
+    --shadow: 0 6px 18px rgba(31,58,95,0.14);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    color:var(--ink);
+    background-color:var(--paper);
+    background-image:
+      repeating-linear-gradient(0deg, var(--grid) 0 1px, transparent 1px 24px),
+      repeating-linear-gradient(90deg, var(--grid) 0 1px, transparent 1px 24px);
+    min-height:100vh;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #app{
+    max-width:480px;
+    margin:0 auto;
+    min-height:100vh;
+    padding:20px 18px 40px;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+  }
+  .brand{ text-align:center; margin-bottom:18px; position:relative; }
+  .brand h1{
+    font-family:'Kaisei Decol', serif; font-size:28px; margin:0;
+    letter-spacing:0.06em; color:var(--ink);
+  }
+  .brand p{ margin:4px 0 0; font-size:11.5px; color:var(--ink-soft); letter-spacing:0.12em; }
+  .bgm-toggle{
+    position:absolute; top:0; right:0; width:36px; height:36px; border-radius:50%;
+    background:var(--card); border:1px solid rgba(31,58,95,0.15);
+    font-size:15px; cursor:pointer; box-shadow:var(--shadow);
+  }
+  .screen{ display:none; flex-direction:column; gap:14px; animation: fadeIn .25s ease; }
+  .screen.active{ display:flex; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  .name-row{
+    display:flex; gap:8px; align-items:center;
+    background:var(--card); border:1px solid rgba(31,58,95,0.12);
+    border-radius:10px; padding:10px 12px; box-shadow:var(--shadow);
+  }
+  .name-row label{ font-size:12px; color:var(--ink-soft); white-space:nowrap; }
+  .name-row input{
+    flex:1; border:none; outline:none; font-family:inherit; font-size:15px;
+    background:transparent; color:var(--ink);
+  }
+
+  .profile-bar{
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:12.5px; color:var(--ink-soft); padding:2px 2px 0;
+  }
+  .profile-bar b{ color:var(--ink); }
+  .profile-bar .switch-link{ background:none; border:none; color:var(--teal,#2E6B8A); font-size:12px; cursor:pointer; font-family:inherit; text-decoration:underline; padding:0; }
+  .profile-delete{ background:none; border:none; color:var(--ink-soft); font-size:16px; cursor:pointer; padding:4px 10px; flex-shrink:0; }
+  .profile-delete:active{ color:var(--red); }
+  .profile-empty{ text-align:center; font-size:12.5px; color:var(--ink-soft); padding:20px 0; }
+
+  .last-record{
+    font-size:11.5px; color:var(--ink-soft);
+    background:rgba(31,58,95,0.05); border-radius:8px;
+    padding:8px 12px; line-height:1.6;
+  }
+  .last-record b{ color:var(--ink); }
+
+  .grade-card{
+    position:relative; background:var(--card); border-radius:14px; padding:16px 18px;
+    box-shadow:var(--shadow); border-left:8px solid var(--stripe,var(--ink));
+    cursor:pointer; overflow:hidden;
+  }
+  .grade-card .kanji{
+    position:absolute; right:8px; top:-8px; font-family:'Kaisei Decol', serif;
+    font-size:60px; color:rgba(31,58,95,0.06); line-height:1;
+  }
+  .grade-card h2{ margin:0 0 4px; font-size:17.5px; font-family:'Kaisei Decol', serif;}
+  .grade-card p{ margin:0; font-size:12px; color:var(--ink-soft); }
+
+  .cat-list{ display:flex; flex-direction:column; gap:10px; }
+  .cat-card{
+    display:flex; align-items:center; gap:12px;
+    background:var(--card); border-radius:12px; padding:14px 14px;
+    box-shadow:var(--shadow); cursor:pointer; border:1px solid rgba(31,58,95,0.08);
+  }
+  .cat-num{ font-family:'Kaisei Decol', serif; font-size:13px; color:var(--ink-soft); width:22px; text-align:center; flex-shrink:0; }
+  .cat-body{ flex:1; }
+  .cat-body h3{ margin:0 0 2px; font-size:15.5px; }
+  .cat-body span{ font-size:11.5px; color:var(--ink-soft); }
+  .cat-rank{
+    font-size:11px; padding:4px 9px; border-radius:20px;
+    background:rgba(214,52,71,0.08); color:var(--red); font-weight:700; white-space:nowrap;
+  }
+
+  .backbtn{
+    align-self:flex-start; background:none; border:none; color:var(--ink-soft);
+    font-size:13px; padding:4px 0; cursor:pointer; font-family:inherit;
+  }
+  .backbtn:before{ content:"← "; }
+
+  .progress-row{ display:flex; justify-content:space-between; align-items:center; font-size:13px; color:var(--ink-soft); }
+  .progress-bar{ height:5px; background:rgba(31,58,95,0.1); border-radius:3px; overflow:hidden; }
+  .progress-bar > div{ height:100%; background:var(--red); transition:width .3s ease; }
+
+  .paper-card{
+    background:var(--card); border-radius:4px; border-left:4px solid var(--red);
+    box-shadow:var(--shadow); padding:28px 20px 24px 22px; min-height:130px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; position:relative;
+  }
+  .q-label{ position:absolute; top:10px; left:16px; font-size:11px; color:var(--ink-soft); }
+  .q-review-badge{ position:absolute; top:10px; right:14px; font-size:11px; color:var(--red); font-weight:700; }
+  .q-text{ font-size:21px; font-weight:700; line-height:1.6; word-break:break-word; }
+  .q-text .frac{ display:inline-flex; flex-direction:column; vertical-align:middle; margin:0 3px; font-size:0.85em;}
+  .q-text .frac .n{ border-bottom:2px solid var(--ink); padding:0 4px; }
+  .q-text .frac .d{ padding:0 4px; }
+
+  .answer-area{ display:flex; flex-direction:column; gap:8px; }
+  .answer-row{ display:flex; gap:8px; }
+  .answer-row input{
+    flex:1; font-size:20px; padding:12px 14px; border-radius:10px;
+    border:2px solid rgba(31,58,95,0.18); font-family:inherit; color:var(--ink);
+    background:var(--card); outline:none;
+  }
+  .answer-row input:focus{ border-color:var(--ink); }
+  .helper-btns{ display:flex; gap:8px; flex-wrap:wrap; }
+  .helper-btns button{
+    font-family:inherit; font-size:14px; padding:6px 14px; border-radius:8px;
+    border:1px solid rgba(31,58,95,0.2); background:var(--card); color:var(--ink);
+  }
+
+  .choice-grid{ display:flex; flex-direction:column; gap:9px; }
+  .choice-btn{
+    background:var(--card); border:2px solid rgba(31,58,95,0.15); border-radius:10px;
+    padding:13px 14px; font-family:inherit; font-size:14.5px; color:var(--ink);
+    cursor:pointer; text-align:left; line-height:1.4;
+  }
+  .choice-btn:active{ transform:scale(0.98); border-color:var(--ink); }
+
+  .btn{
+    font-family:inherit; font-size:16px; font-weight:700; padding:13px 16px;
+    border-radius:10px; border:none; cursor:pointer; letter-spacing:0.04em;
+  }
+  .btn-primary{ background:var(--ink); color:#fff; }
+  .btn-primary:disabled{ opacity:0.4; }
+  .btn-outline{ background:transparent; color:var(--ink); border:2px solid var(--ink); }
+  .btn-review{ background:var(--red); color:#fff; }
+
+  .mark-overlay{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:50; }
+  .mark-overlay svg{ width:140px; height:140px; }
+  .mark-circle{ fill:none; stroke:var(--red); stroke-width:8; stroke-linecap:round;
+    stroke-dasharray:340; stroke-dashoffset:340; animation: draw .5s ease forwards; }
+  .mark-cross line{ stroke:var(--red); stroke-width:8; stroke-linecap:round;
+    stroke-dasharray:150; stroke-dashoffset:150; animation: draw .35s ease forwards; }
+  @keyframes draw{ to{ stroke-dashoffset:0; } }
+
+  .feedback-text{ text-align:center; font-size:13px; color:var(--ink-soft); min-height:18px; }
+  .feedback-text b{ color:var(--red); }
+
+  .cert{
+    background:var(--card); border:3px double var(--ink); border-radius:6px;
+    padding:30px 22px; text-align:center; box-shadow:var(--shadow); position:relative;
+  }
+  .cert .eyebrow{ font-size:12px; letter-spacing:0.3em; color:var(--ink-soft); }
+  .cert h2{ font-family:'Kaisei Decol', serif; font-size:26px; margin:6px 0 18px; }
+  .cert .name{ font-size:19px; font-weight:700; border-bottom:1px solid var(--ink); display:inline-block; padding:0 10px 4px; margin-bottom:6px;}
+  .cert .name-suffix{ font-size:13px; color:var(--ink-soft); }
+  .cert .rankwrap{ display:flex; align-items:center; justify-content:center; gap:16px; margin:20px 0; }
+  .hanko{
+    width:76px; height:76px; border-radius:50%; border:4px solid var(--red);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    color:var(--red); font-family:'Kaisei Decol', serif; font-size:13px; font-weight:700;
+    transform:rotate(-6deg);
+  }
+  .cert .rankname{ font-family:'Kaisei Decol', serif; font-size:26px; color:var(--ink); text-align:left; }
+  .cert .meta{ font-size:12px; color:var(--ink-soft); line-height:1.8; margin-top:6px; }
+  .cert-actions{ display:flex; flex-direction:column; gap:10px; margin-top:22px; }
+  .cert-actions .btn-row{ display:flex; gap:10px; }
+  .cert-actions .btn-row .btn{ flex:1; }
+
+  .footnote{ text-align:center; font-size:10.5px; color:var(--ink-soft); margin-top:auto; padding-top:22px; opacity:0.7; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="brand">
+    <button class="bgm-toggle" id="bgmToggle" onclick="toggleBGM()">🔊</button>
+    <h1>まなび道場</h1>
+    <p>MANABI DOJO ー 5教科トレーニング</p>
+  </div>
+
+  <!-- PROFILE: だれがつかうか選択 -->
+  <div class="screen active" id="screen-profile">
+    <div class="cat-list" id="profileList"></div>
+    <div class="name-row" id="addProfileRow" style="display:none;">
+      <input id="newProfileName" type="text" placeholder="なまえを入力" maxlength="12">
+      <button class="btn btn-primary" style="padding:9px 16px;font-size:14px;" onclick="createProfile()">作成</button>
+    </div>
+    <button class="btn btn-outline" onclick="toggleAddProfile()">＋ 新しいプロフィール</button>
+    <div class="footnote">プロフィールごとに記録が保存されます（最大8人まで）</div>
+  </div>
+
+  <!-- SUBJECTS: 教科選択 -->
+  <div class="screen" id="screen-subjects">
+    <div class="profile-bar">
+      <span>ようこそ、<b id="profileWelcome"></b>さん</span>
+      <button class="switch-link" onclick="playClick();showScreen('profile')">プロフィールを切り替える</button>
+    </div>
+    <div class="last-record" id="lastRecord" style="display:none;"></div>
+
+    <div class="grade-card" style="--stripe:#1F3A5F;" onclick="selectSubject('math')">
+      <div class="kanji">算</div>
+      <h2>算数・数学</h2>
+      <p>計算問題（自動生成・無限に挑戦できます）</p>
+    </div>
+    <div class="grade-card" style="--stripe:#7A4B6B;" onclick="selectSubject('kokugo')">
+      <div class="kanji">国</div>
+      <h2>国語（漢字・語彙）</h2>
+      <p>漢字の読み書き・熟語・ことわざ</p>
+    </div>
+    <div class="grade-card" style="--stripe:#2E7D6B;" onclick="selectSubject('science')">
+      <div class="kanji">理</div>
+      <h2>理科</h2>
+      <p>一問一答クイズ</p>
+    </div>
+    <div class="grade-card" style="--stripe:#A66A2E;" onclick="selectSubject('social')">
+      <div class="kanji">社</div>
+      <h2>社会</h2>
+      <p>地理・歴史・公民の一問一答</p>
+    </div>
+    <div class="grade-card" style="--stripe:#4A5FA8;" onclick="selectSubject('english')">
+      <div class="kanji">英</div>
+      <h2>英語</h2>
+      <p>単語・文法の一問一答</p>
+    </div>
+    <div class="footnote">1回10問・全問終わると段位認定証がもらえます</div>
+  </div>
+
+  <!-- GRADE: 学年選択 -->
+  <div class="screen" id="screen-grade">
+    <button class="backbtn" onclick="playClick();showScreen('subjects')">もどる</button>
+    <div class="cat-list" id="gradeList"></div>
+  </div>
+
+  <!-- LEVEL: 算数・数学のカテゴリ選択 -->
+  <div class="screen" id="screen-level">
+    <button class="backbtn" onclick="playClick();showScreen('grade')">もどる</button>
+    <div class="cat-list" id="catList"></div>
+  </div>
+
+  <!-- QUIZ -->
+  <div class="screen" id="screen-quiz">
+    <div class="progress-row">
+      <span id="qCounter">第1問 / 10</span>
+      <span id="qTimer">00:00</span>
+    </div>
+    <div class="progress-bar"><div id="qProgressFill" style="width:0%"></div></div>
+
+    <div class="paper-card">
+      <span class="q-label" id="qCatLabel"></span>
+      <span class="q-review-badge" id="qReviewBadge" style="display:none;">復習中</span>
+      <div class="q-text" id="qText"></div>
+    </div>
+
+    <div class="answer-area">
+      <div class="answer-row">
+        <input id="answerInput" type="text" inputmode="text" placeholder="こたえを入力" autocomplete="off">
+        <button class="btn btn-primary" id="submitBtn" onclick="submitAnswer()">こたえる</button>
+      </div>
+      <div class="helper-btns" id="helperBtns"></div>
+      <div class="choice-grid" id="choiceGrid" style="display:none;"></div>
+      <div class="feedback-text" id="feedbackText"></div>
+    </div>
+  </div>
+
+  <!-- RESULT -->
+  <div class="screen" id="screen-result">
+    <div class="cert">
+      <div class="eyebrow" id="certEyebrow">CERTIFICATE OF ACHIEVEMENT</div>
+      <h2 id="certTitle">認定証</h2>
+      <div>
+        <span class="name" id="certName">名無し</span>
+        <div class="name-suffix">殿</div>
+      </div>
+      <div class="rankwrap">
+        <div class="hanko">合格</div>
+        <div class="rankname" id="certRank">三級</div>
+      </div>
+      <div class="meta" id="certMeta"></div>
+    </div>
+    <div class="cert-actions">
+      <button class="btn btn-review" id="reviewBtn" style="display:none;" onclick="reviewMissed()"></button>
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="playClick();showScreen('subjects')">ホームへ</button>
+        <button class="btn btn-primary" onclick="retrySameCategory()">もう一度</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- JavaScript モジュール -->
+<script src="js/utils.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/questions.js"></script>
+<script src="js/generator.js"></script>
+<script src="js/ui.js"></script>
+
+</body>
+</html>
+
