@@ -111,6 +111,21 @@
   }
   .record-row .cat-body span{ line-height:1.6; }
 
+  .achievement-grid{ display:flex; flex-direction:column; gap:14px; }
+  .achievement-card{
+    background:var(--card); border-radius:14px; padding:16px;
+    box-shadow:var(--shadow); display:flex; flex-direction:column;
+    align-items:center; gap:8px;
+  }
+  .achievement-card h3{ font-family:'Kaisei Decol', serif; font-size:16px; margin:0; color:var(--ink); }
+  .achievement-total{ font-size:12px; color:var(--ink-soft); }
+  .achievement-chips{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-top:2px; }
+  .achievement-chip{
+    display:flex; align-items:center; gap:5px; font-size:11px;
+    background:rgba(31,58,95,0.05); border-radius:20px; padding:4px 10px 4px 8px; color:var(--ink);
+  }
+  .achievement-chip .dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
   .grade-card{
     position:relative; background:var(--card); border-radius:14px; padding:16px 18px;
     box-shadow:var(--shadow); border-left:8px solid var(--stripe,var(--ink));
@@ -254,6 +269,7 @@
     </div>
     <div class="last-record" id="lastRecord" style="display:none;"></div>
     <button class="records-link" onclick="goToRecords()">📊 単元ごとの記録をみる</button>
+    <button class="records-link" onclick="goToAchievement()">📈 学年別の達成率をみる</button>
 
     <div class="grade-card" style="--stripe:#1F3A5F;" onclick="selectSubject('math')">
       <div class="kanji">算</div>
@@ -288,6 +304,12 @@
     <button class="backbtn" onclick="playClick();showScreen('subjects')">もどる</button>
     <div class="records-summary" id="recordsSummary"></div>
     <div id="recordsList"></div>
+  </div>
+
+  <!-- ACHIEVEMENT: 学年別・科目横断の達成率（五角形レーダーチャート） -->
+  <div class="screen" id="screen-achievement">
+    <button class="backbtn" onclick="playClick();showScreen('subjects')">もどる</button>
+    <div class="achievement-grid" id="achievementGrid"></div>
   </div>
 
   <!-- GRADE: 学年選択 -->
@@ -356,6 +378,7 @@
 <script src="js/utils.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/questions.js"></script>
+<script src="js/kotowaza.js"></script>
 <script src="js/generator.js"></script>
 <script src="js/ui.js"></script>
 

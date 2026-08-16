@@ -18,7 +18,8 @@ let state = {
   mode: 'normal',
   missed: [],
   reviewQueue: [],
-  sessionQueue: []
+  sessionQueue: [],
+  activeBank: []
 };
 
 /* ---------- プロフィール管理 ---------- */
@@ -140,11 +141,17 @@ function showScreen(name) {
     renderLastRecord();
   }
   if (name === 'records') renderRecords();
+  if (name === 'achievement') renderAchievement();
 }
 
 function goToRecords() {
   playClick();
   showScreen('records');
+}
+
+function goToAchievement() {
+  playClick();
+  showScreen('achievement');
 }
 
 /* ---------- 単元ごとの記録一覧 ---------- */
@@ -157,6 +164,10 @@ function getAllCatDefs() {
     GRADE_ORDER.forEach(grade => {
       if (subject === 'math') {
         CATEGORIES[grade].forEach(cat => {
+          defs.push({ subject, grade, catId: cat.id, catName: cat.name });
+        });
+      } else if (subject === 'kokugo') {
+        KOKUGO_CATEGORIES[grade].forEach(cat => {
           defs.push({ subject, grade, catId: cat.id, catName: cat.name });
         });
       } else {
@@ -232,6 +243,128 @@ function renderRecords() {
   }
 }
 
+/* ---------- 学年別・科目横断の達成率（五角形レーダーチャート） ---------- */
+// 達成率の定義: その科目・学年の単元総数を分母、段位が三段（＝過去に10問全問正解）
+// に達した単元の数を分子とする。
+const GRADE_ACCENT = { g6: '#3F7A56', g7: '#2E6B8A', g8: '#B0722D', g9: '#1F3A5F' };
+const RADAR_SUBJECT_ORDER = ['math', 'kokugo', 'science', 'social', 'english'];
+const RADAR_SUBJECT_SHORT = { math: '算', kokugo: '国', science: '理', social: '社', english: '英' };
+const PERFECT_RANK_IDX = RANKS.length - 1; // 三段（10/10）
+
+function computeGradeAchievement(profile, grade) {
+  const defs = getAllCatDefs().filter(d => d.grade === grade);
+  const bySubject = {};
+  RADAR_SUBJECT_ORDER.forEach(s => { bySubject[s] = { total: 0, perfect: 0 }; });
+
+  defs.forEach(d => {
+    const bucket = bySubject[d.subject];
+    bucket.total += 1;
+    const bestIdx = parseInt(localStorage.getItem(`kd-best-${profile}-${d.catId}`) || '-1');
+    if (bestIdx === PERFECT_RANK_IDX) bucket.perfect += 1;
+  });
+
+  const rates = RADAR_SUBJECT_ORDER.map(s => (bySubject[s].total > 0 ? bySubject[s].perfect / bySubject[s].total : 0));
+  const totalUnits = RADAR_SUBJECT_ORDER.reduce((sum, s) => sum + bySubject[s].total, 0);
+  const totalPerfect = RADAR_SUBJECT_ORDER.reduce((sum, s) => sum + bySubject[s].perfect, 0);
+
+  return { bySubject, rates, totalUnits, totalPerfect };
+}
+
+// rates: [算,国,理,社,英] の順で 0〜1 の配列
+function buildRadarSVG(rates, accentColor) {
+  const size = 220;
+  const cx = size / 2;
+  const cy = 112;
+  const R = 72;
+  const N = 5;
+
+  function pt(fracRadius, i) {
+    const angle = -Math.PI / 2 + i * ((2 * Math.PI) / N);
+    return [cx + R * fracRadius * Math.cos(angle), cy + R * fracRadius * Math.sin(angle)];
+  }
+  function pointsAttr(fracRadius) {
+    return Array.from({ length: N }, (_, i) => pt(fracRadius, i).join(',')).join(' ');
+  }
+
+  // 目安の五角形（25/50/75/100%）
+  const guideRings = [0.25, 0.5, 0.75, 1]
+    .map(f => `<polygon points="${pointsAttr(f)}" fill="none" stroke="rgba(31,58,95,0.15)" stroke-width="1"/>`)
+    .join('');
+
+  // 中心から各頂点への軸線
+  const axisLines = Array.from({ length: N }, (_, i) => {
+    const [x, y] = pt(1, i);
+    return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="rgba(31,58,95,0.15)" stroke-width="1"/>`;
+  }).join('');
+
+  // 実績（データ）ポリゴン
+  const dataPoints = rates.map((r, i) => pt(Math.max(r, 0.03), i)); // 0%でも中心の点で潰れないよう最低限の見た目を確保
+  const dataPointsAttr = dataPoints.map(p => p.join(',')).join(' ');
+  const dataDots = dataPoints
+    .map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.2" fill="${accentColor}"/>`)
+    .join('');
+
+  // ラベル（科目の頭文字、科目カラーで着色）
+  const labels = Array.from({ length: N }, (_, i) => {
+    const [x, y] = pt(1.22, i);
+    const subject = RADAR_SUBJECT_ORDER[i];
+    return `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle"
+      font-size="13" font-weight="700" fill="${SUBJECT_STRIPE[subject]}">${RADAR_SUBJECT_SHORT[subject]}</text>`;
+  }).join('');
+
+  return `
+    <svg viewBox="0 0 ${size} ${size - 10}" width="100%" style="max-width:240px;">
+      ${guideRings}
+      ${axisLines}
+      <polygon points="${dataPointsAttr}" fill="${accentColor}" fill-opacity="0.32" stroke="${accentColor}" stroke-width="2.2" stroke-linejoin="round"/>
+      ${dataDots}
+      ${labels}
+    </svg>
+  `;
+}
+
+function renderAchievement() {
+  const wrap = document.getElementById('achievementGrid');
+  wrap.innerHTML = '';
+  if (!state.profile) return;
+
+  GRADE_ORDER.forEach(grade => {
+    const { bySubject, rates, totalUnits, totalPerfect } = computeGradeAchievement(state.profile, grade);
+    const accent = GRADE_ACCENT[grade];
+    const overallPct = totalUnits > 0 ? Math.round((totalPerfect / totalUnits) * 100) : 0;
+
+    const card = document.createElement('div');
+    card.className = 'achievement-card';
+
+    const heading = document.createElement('h3');
+    heading.textContent = `${GRADE_LABEL[grade]}`;
+    card.appendChild(heading);
+
+    const totalLine = document.createElement('div');
+    totalLine.className = 'achievement-total';
+    totalLine.textContent = `総合達成率 ${totalPerfect} / ${totalUnits} 単元（${overallPct}%）`;
+    card.appendChild(totalLine);
+
+    const chartWrap = document.createElement('div');
+    chartWrap.innerHTML = buildRadarSVG(rates, accent);
+    card.appendChild(chartWrap);
+
+    const chips = document.createElement('div');
+    chips.className = 'achievement-chips';
+    RADAR_SUBJECT_ORDER.forEach(subject => {
+      const b = bySubject[subject];
+      const pct = b.total > 0 ? Math.round((b.perfect / b.total) * 100) : 0;
+      const chip = document.createElement('div');
+      chip.className = 'achievement-chip';
+      chip.innerHTML = `<span class="dot" style="background:${SUBJECT_STRIPE[subject]}"></span>${SUBJECT_LABEL[subject]} ${b.perfect}/${b.total}（${pct}%）`;
+      chips.appendChild(chip);
+    });
+    card.appendChild(chips);
+
+    wrap.appendChild(card);
+  });
+}
+
 function selectSubject(subject) {
   playClick();
   state.subject = subject;
@@ -263,6 +396,9 @@ function onGradeChosen(subject, grade) {
   if (subject === 'math') {
     renderCategoryList();
     showScreen('level');
+  } else if (subject === 'kokugo') {
+    renderKokugoCategoryList();
+    showScreen('level');
   } else {
     startKnowledgeQuiz(subject, grade);
   }
@@ -278,6 +414,29 @@ function renderCategoryList() {
     div.onclick = () => {
       playClick();
       startQuiz(cat.id);
+    };
+    div.innerHTML = `
+      <div class="cat-num">${String(idx + 1).padStart(2, '0')}</div>
+      <div class="cat-body">
+        <h3>${cat.name}</h3>
+        <span>${cat.desc}</span>
+      </div>
+      ${bestIdx >= 0 ? `<div class="cat-rank">${RANKS[bestIdx]}</div>` : ''}
+    `;
+    list.appendChild(div);
+  });
+}
+
+function renderKokugoCategoryList() {
+  const list = document.getElementById('catList');
+  list.innerHTML = '';
+  KOKUGO_CATEGORIES[state.grade].forEach((cat, idx) => {
+    const bestIdx = parseInt(localStorage.getItem(`kd-best-${state.profile}-${cat.id}`) || '-1');
+    const div = document.createElement('div');
+    div.className = 'cat-card';
+    div.onclick = () => {
+      playClick();
+      startKokugoCategoryQuiz(cat);
     };
     div.innerHTML = `
       <div class="cat-num">${String(idx + 1).padStart(2, '0')}</div>
@@ -309,12 +468,13 @@ function startQuiz(catId) {
   startTimer();
 }
 
-function startKnowledgeQuiz(subject, grade) {
-  state.subject = subject;
-  state.grade = grade;
-  state.catId = subject + '_' + grade;
-  state.catName = CATEGORY_LABEL[subject];
-  const bank = QUESTION_BANKS[subject][grade];
+// 「単元固定の問題プールから10問サンプリングして出題する」系のクイズ共通処理。
+// 国語の追加単元（ことわざ・四字熟語・故事成語）と、
+// 理科・社会・英語（学年ごとに単元1つ）の両方から使う。
+function startBankQuiz(catId, catName, bank) {
+  state.catId = catId;
+  state.catName = catName;
+  state.activeBank = bank;
   const picked = shuffleArray(bank).slice(0, Math.min(10, bank.length));
   state.sessionQueue = picked.map(cloneShuffled);
   state.mode = 'normal';
@@ -329,10 +489,21 @@ function startKnowledgeQuiz(subject, grade) {
   startTimer();
 }
 
+function startKnowledgeQuiz(subject, grade) {
+  state.subject = subject;
+  state.grade = grade;
+  startBankQuiz(`${subject}_${grade}`, CATEGORY_LABEL[subject], QUESTION_BANKS[subject][grade]);
+}
+
+function startKokugoCategoryQuiz(cat) {
+  state.subject = 'kokugo';
+  startBankQuiz(cat.id, cat.name, cat.bank);
+}
+
 function retrySameCategory() {
   playClick();
   if (state.subject === 'math') startQuiz(state.catId);
-  else startKnowledgeQuiz(state.subject, state.grade);
+  else startBankQuiz(state.catId, state.catName, state.activeBank);
 }
 
 function reviewMissed() {
