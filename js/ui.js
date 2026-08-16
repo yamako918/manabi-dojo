@@ -166,12 +166,10 @@ function getAllCatDefs() {
         CATEGORIES[grade].forEach(cat => {
           defs.push({ subject, grade, catId: cat.id, catName: cat.name });
         });
-      } else if (subject === 'kokugo') {
-        KOKUGO_CATEGORIES[grade].forEach(cat => {
+      } else {
+        NONMATH_CATEGORIES[subject]()[grade].forEach(cat => {
           defs.push({ subject, grade, catId: cat.id, catName: cat.name });
         });
-      } else {
-        defs.push({ subject, grade, catId: `${subject}_${grade}`, catName: CATEGORY_LABEL[subject] });
       }
     });
   });
@@ -389,19 +387,24 @@ function renderGradeList(subject) {
   });
 }
 
+// 学年ごとに複数単元を持つ「非数学」科目の登録表
+const NONMATH_CATEGORIES = {
+  kokugo: () => KOKUGO_CATEGORIES,
+  science: () => SCIENCE_CATEGORIES,
+  social: () => SOCIAL_CATEGORIES,
+  english: () => ENGLISH_CATEGORIES,
+};
+
 function onGradeChosen(subject, grade) {
   playClick();
   state.subject = subject;
   state.grade = grade;
   if (subject === 'math') {
     renderCategoryList();
-    showScreen('level');
-  } else if (subject === 'kokugo') {
-    renderKokugoCategoryList();
-    showScreen('level');
   } else {
-    startKnowledgeQuiz(subject, grade);
+    renderSubjectCategoryList(subject);
   }
+  showScreen('level');
 }
 
 function renderCategoryList() {
@@ -427,16 +430,18 @@ function renderCategoryList() {
   });
 }
 
-function renderKokugoCategoryList() {
+// 国語・理科・社会・英語（すべて学年ごとに複数単元）共通のカテゴリ一覧描画
+function renderSubjectCategoryList(subject) {
   const list = document.getElementById('catList');
   list.innerHTML = '';
-  KOKUGO_CATEGORIES[state.grade].forEach((cat, idx) => {
+  const cats = NONMATH_CATEGORIES[subject]()[state.grade];
+  cats.forEach((cat, idx) => {
     const bestIdx = parseInt(localStorage.getItem(`kd-best-${state.profile}-${cat.id}`) || '-1');
     const div = document.createElement('div');
     div.className = 'cat-card';
     div.onclick = () => {
       playClick();
-      startKokugoCategoryQuiz(cat);
+      startBankQuiz(cat.id, cat.name, cat.bank);
     };
     div.innerHTML = `
       <div class="cat-num">${String(idx + 1).padStart(2, '0')}</div>
@@ -469,8 +474,7 @@ function startQuiz(catId) {
 }
 
 // 「単元固定の問題プールから10問サンプリングして出題する」系のクイズ共通処理。
-// 国語の追加単元（ことわざ・四字熟語・故事成語）と、
-// 理科・社会・英語（学年ごとに単元1つ）の両方から使う。
+// 国語・理科・社会・英語の各単元がすべてこれを使う。
 function startBankQuiz(catId, catName, bank) {
   state.catId = catId;
   state.catName = catName;
@@ -489,21 +493,24 @@ function startBankQuiz(catId, catName, bank) {
   startTimer();
 }
 
-function startKnowledgeQuiz(subject, grade) {
-  state.subject = subject;
-  state.grade = grade;
-  startBankQuiz(`${subject}_${grade}`, CATEGORY_LABEL[subject], QUESTION_BANKS[subject][grade]);
-}
-
-function startKokugoCategoryQuiz(cat) {
-  state.subject = 'kokugo';
-  startBankQuiz(cat.id, cat.name, cat.bank);
-}
-
 function retrySameCategory() {
   playClick();
   if (state.subject === 'math') startQuiz(state.catId);
   else startBankQuiz(state.catId, state.catName, state.activeBank);
+}
+
+// クイズ画面の「もどる」。選んだ単元の一覧（or 学年選択）に戻る。
+// 途中で抜けると今回の記録は保存されないので確認を挟む。
+function quitQuiz() {
+  if (!confirm('クイズを中断してもどりますか？（今回の記録は保存されません）')) return;
+  playClick();
+  clearInterval(state.timerHandle);
+  if (state.subject === 'math') {
+    renderCategoryList();
+  } else {
+    renderSubjectCategoryList(state.subject);
+  }
+  showScreen('level');
 }
 
 function reviewMissed() {

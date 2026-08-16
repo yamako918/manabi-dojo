@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'manabi-dojo-v10';
+﻿const CACHE_NAME = 'manabi-dojo-v11';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const ASSETS = [
   './js/audio.js',
   './js/questions.js',
   './js/kotowaza.js',
+  './js/expansion.js',
   './js/generator.js',
   './js/ui.js'
 ];
