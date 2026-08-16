@@ -478,6 +478,9 @@ function finishQuiz() {
   clearInterval(state.timerHandle);
   const rankIdx = state.correctCount;
   const isReview = state.mode === 'review';
+  const isPerfect = state.total > 0 && state.correctCount === state.total;
+
+  if (isPerfect) playFanfare();
 
   if (!isReview) {
     const prevBest = parseInt(localStorage.getItem(`kd-best-${state.profile}-${state.catId}`) || '-1');
