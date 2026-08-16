@@ -182,14 +182,17 @@ const SCIENCE_CATEGORIES = {
   g7: [
     { id: 'science_g7', name: '理科クイズ①', desc: '状態変化・光と音・植物のからだ など', bank: QUESTION_BANKS.science.g7 },
     { id: 'science2_g7', name: '理科クイズ②', desc: '溶解度・地震・電気の力 など', bank: SCIENCE2_G7 },
+    { id: 'science3_g7', name: '理科クイズ③', desc: '電流・光の反射・花のつくり・岩石 など', bank: SCIENCE3_G7 },
   ],
   g8: [
     { id: 'science_g8', name: '理科クイズ①', desc: '化学変化・電流・動物のからだ など', bank: QUESTION_BANKS.science.g8 },
     { id: 'science2_g8', name: '理科クイズ②', desc: '回路・前線・気団・神経 など', bank: SCIENCE2_G8 },
+    { id: 'science3_g8', name: '理科クイズ③', desc: '消化酵素・電磁誘導・天気図 など', bank: SCIENCE3_G8 },
   ],
   g9: [
     { id: 'science_g9', name: '理科クイズ①', desc: '力学・遺伝・地球と宇宙 など', bank: QUESTION_BANKS.science.g9 },
     { id: 'science2_g9', name: '理科クイズ②', desc: '減数分裂・電池・光の屈折 など', bank: SCIENCE2_G9 },
+    { id: 'science3_g9', name: '理科クイズ③', desc: 'DNA・pH・恒星・フックの法則 など', bank: SCIENCE3_G9 },
   ],
 };
 
@@ -201,14 +204,17 @@ const SOCIAL_CATEGORIES = {
   g7: [
     { id: 'social_g7', name: '社会クイズ①', desc: '世界と日本の地理', bank: QUESTION_BANKS.social.g7 },
     { id: 'social2_g7', name: '社会クイズ②', desc: '時差・気候帯・グローバル化 など', bank: SOCIAL2_G7 },
+    { id: 'social3_g7', name: '社会クイズ③', desc: '日本の地形・気候・産業 など', bank: SOCIAL3_G7 },
   ],
   g8: [
     { id: 'social_g8', name: '社会クイズ①', desc: '近現代史', bank: QUESTION_BANKS.social.g8 },
     { id: 'social2_g8', name: '社会クイズ②', desc: '大正〜戦後・基本的人権 など', bank: SOCIAL2_G8 },
+    { id: 'social3_g8', name: '社会クイズ③', desc: '幕末〜明治維新の詳細 など', bank: SOCIAL3_G8 },
   ],
   g9: [
     { id: 'social_g9', name: '社会クイズ①', desc: '公民（政治・経済）', bank: QUESTION_BANKS.social.g9 },
     { id: 'social2_g9', name: '社会クイズ②', desc: '経済のしくみ・国際社会 など', bank: SOCIAL2_G9 },
+    { id: 'social3_g9', name: '社会クイズ③', desc: '地方自治・労働・国際機関 など', bank: SOCIAL3_G9 },
   ],
 };
 
@@ -220,13 +226,16 @@ const ENGLISH_CATEGORIES = {
   g7: [
     { id: 'english_g7', name: '英語クイズ①', desc: 'be動詞・一般動詞・疑問文', bank: QUESTION_BANKS.english.g7 },
     { id: 'english2_g7', name: '英語クイズ②', desc: '単語・表現 など', bank: ENGLISH2_G7 },
+    { id: 'english3_g7', name: '英語クイズ③', desc: '助動詞・単語表現 など', bank: ENGLISH3_G7 },
   ],
   g8: [
     { id: 'english_g8', name: '英語クイズ①', desc: '比較・受け身・不定詞・関係代名詞', bank: QUESTION_BANKS.english.g8 },
     { id: 'english2_g8', name: '英語クイズ②', desc: '単語・表現 など', bank: ENGLISH2_G8 },
+    { id: 'english3_g8', name: '英語クイズ③', desc: '現在完了・不定詞・使役 など', bank: ENGLISH3_G8 },
   ],
   g9: [
     { id: 'english_g9', name: '英語クイズ①', desc: '現在完了進行形・仮定法・分詞構文', bank: QUESTION_BANKS.english.g9 },
     { id: 'english2_g9', name: '英語クイズ②', desc: '単語・熟語表現 など', bank: ENGLISH2_G9 },
+    { id: 'english3_g9', name: '英語クイズ③', desc: '熟語・関係副詞・分詞 など', bank: ENGLISH3_G9 },
   ],
 };
