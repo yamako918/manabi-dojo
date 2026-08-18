@@ -1,0 +1,51 @@
+rules_version = '2';
+
+// まなび道場 - Firestore セキュリティルール
+// Firebaseコンソール → Databases & Storage → Firestore → Rules タブに
+// この内容をそのまま貼り付けて「公開（Publish）」してください。
+//
+// 前提: Authentication で「匿名（Anonymous）」ログインを有効にしていること。
+// このアプリは request.auth の有無だけを見ており、個人を特定する認証は
+// 行っていません（家族内での利用を想定した、緩い保護です）。
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // みんなの記録（プロフィール名がそのままドキュメントID）
+    match /leaderboard/{profileName} {
+      allow read: if request.auth != null;
+
+      allow write: if request.auth != null
+        && request.resource.data.name == profileName
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 20
+        && request.resource.data.streakCount is int
+        && request.resource.data.perfectCount is int
+        && request.resource.data.totalCorrect is int
+        && request.resource.data.badgeCount is int;
+    }
+
+    // 応援スタンプ（送信のみ許可。改ざん防止のため更新・削除は不可）
+    match /cheers/{cheerId} {
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+        && request.resource.data.to is string
+        && request.resource.data.to.size() > 0
+        && request.resource.data.to.size() <= 20
+        && request.resource.data.from is string
+        && request.resource.data.from.size() > 0
+        && request.resource.data.from.size() <= 20
+        && request.resource.data.emoji in ['🎉', '👍', '🔥', '💪', '😊', '⭐']
+        && request.resource.data.sentAt == request.time;
+
+      allow update, delete: if false;
+    }
+
+    // 上記以外はすべて拒否
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

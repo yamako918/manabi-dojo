@@ -145,10 +145,12 @@ function showScreen(name) {
     renderLastRecord();
     renderMascotHome();
     renderWeakButton();
+    checkNewCheers();
   }
   if (name === 'records') renderRecords();
   if (name === 'achievement') renderAchievement();
   if (name === 'badges') renderBadgeScreen();
+  if (name === 'leaderboard') renderLeaderboard();
 }
 
 function goToRecords() {
@@ -552,6 +554,69 @@ function renderBadgeScreen() {
 function goToBadges() {
   playClick();
   showScreen('badges');
+}
+
+/* ---------- みんなの記録・応援スタンプ（Firebase、任意機能） ---------- */
+function goToLeaderboard() {
+  playClick();
+  showScreen('leaderboard');
+}
+
+async function renderLeaderboard() {
+  const wrap = document.getElementById('leaderboardList');
+  const notice = document.getElementById('leaderboardNotice');
+  wrap.innerHTML = '';
+  if (!isCloudConfigured()) {
+    notice.style.display = 'block';
+    notice.textContent = 'クラウド連携がまだ設定されていません（js/firebase-config.js を設定すると使えるようになります）。';
+    return;
+  }
+  notice.style.display = 'none';
+  wrap.innerHTML = `<div class="footnote" style="padding:14px 0;">読み込み中…</div>`;
+  const list = await loadLeaderboard();
+  wrap.innerHTML = '';
+  if (list.length === 0) {
+    wrap.innerHTML = `<div class="footnote" style="padding:14px 0;">まだ誰も記録を送っていません。クイズに挑戦すると自動的に登録されます。</div>`;
+    return;
+  }
+  list.forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'cat-card';
+    const isSelf = entry.name === state.profile;
+    const cheerBtns = isSelf
+      ? ''
+      : CHEER_EMOJIS.map(e => `<button class="cheer-btn" data-emoji="${e}">${e}</button>`).join('');
+    row.innerHTML = `
+      <div class="cat-body">
+        <h3>${entry.name}${isSelf ? '（自分）' : ''}</h3>
+        <span>累計${entry.totalCorrect || 0}問正解・連続${entry.streakCount || 0}日・バッジ${entry.badgeCount || 0}個</span>
+        ${!isSelf ? `<div class="cheer-row">${cheerBtns}</div>` : ''}
+      </div>
+    `;
+    if (!isSelf) {
+      row.querySelectorAll('.cheer-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          playClick();
+          btn.disabled = true;
+          const ok = await sendCheer(state.profile, entry.name, btn.dataset.emoji);
+          btn.textContent = ok ? '送った！' : '失敗…';
+        });
+      });
+    }
+    wrap.appendChild(row);
+  });
+}
+
+async function checkNewCheers() {
+  if (!state.profile || !isCloudConfigured()) return;
+  const cheers = await loadNewCheers(state.profile);
+  if (cheers.length === 0) return;
+  const box = document.getElementById('cheerNotice');
+  if (!box) return;
+  const names = [...new Set(cheers.map(c => c.from))].join('、');
+  const emojis = cheers.map(c => c.emoji).join(' ');
+  box.style.display = 'block';
+  box.textContent = `${names}さんから応援がとどいたよ！ ${emojis}`;
 }
 
 function startWeakReview() {
@@ -1036,6 +1101,11 @@ function finishQuiz() {
 
     // 連続プレイ日数の更新（通常モードの1セッション完了のみでカウント）
     updateStreak(state.profile);
+  }
+
+  // クラウド連携が設定されていれば、みんなの記録へ送信する（未設定なら何もしない）
+  if (isCloudConfigured()) {
+    syncLeaderboard(state.profile);
   }
 
   const today = new Date();
