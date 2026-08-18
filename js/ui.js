@@ -119,6 +119,8 @@ function deleteProfile(name) {
   playClick();
   saveProfiles(getProfiles().filter(n => n !== name));
   localStorage.removeItem(`kd-last-record-${name}`);
+  localStorage.removeItem(`kd-weak-${name}`);
+  localStorage.removeItem(`kd-streak-${name}`);
   Object.keys(localStorage).forEach(k => {
     if (k.startsWith(`kd-best-${name}-`) || k.startsWith(`kd-stats-${name}-`)) localStorage.removeItem(k);
   });
@@ -139,6 +141,8 @@ function showScreen(name) {
   if (name === 'subjects') {
     document.getElementById('profileWelcome').textContent = state.profile || '';
     renderLastRecord();
+    renderMascotHome();
+    renderWeakButton();
   }
   if (name === 'records') renderRecords();
   if (name === 'achievement') renderAchievement();
@@ -266,6 +270,230 @@ function computeGradeAchievement(profile, grade) {
   const totalPerfect = RADAR_SUBJECT_ORDER.reduce((sum, s) => sum + bySubject[s].perfect, 0);
 
   return { bySubject, rates, totalUnits, totalPerfect };
+}
+
+/* ---------- マスコット（応援メッセージ） ----------
+   フェーズ2（Firebase等でのクラウド同期）を見据え、
+   「profile名で読み書きする」という現行の設計をそのまま踏襲する。
+   将来的にはlocalStorageの参照先をFirestoreの該当ドキュメントに
+   差し替えるだけで移行できるよう、ロジック（getMascotMessage等）と
+   データアクセス（localStorage.getItem）を分離してある。 */
+const MASCOT_GENERIC_MESSAGES = [
+  '今日もいっしょにがんばろう！',
+  'コツコツ続けることが一番の近道だよ。',
+  '苦手な単元こそ、伸びしろのサインだよ！',
+  '深呼吸してから挑戦してみよう。',
+  '前回よりちょっとだけ頑張ってみよう！',
+  '一問一問、ていねいに解いていこう。',
+  'キミのペースでだいじょうぶ！',
+  '今日はどの教科に挑戦する？',
+];
+
+function mascotSVG(mood) {
+  const eyes = mood === 'happy'
+    ? `<path d="M18 30 Q22 25.5 26 30" stroke="#1F3A5F" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+       <path d="M30 30 Q34 25.5 38 30" stroke="#1F3A5F" stroke-width="2.6" fill="none" stroke-linecap="round"/>`
+    : `<circle cx="22" cy="29" r="4" fill="#1F3A5F"/><circle cx="34" cy="29" r="4" fill="#1F3A5F"/>
+       <circle cx="23.2" cy="27.8" r="1.1" fill="#fff"/><circle cx="35.2" cy="27.8" r="1.1" fill="#fff"/>`;
+  return `
+    <svg viewBox="0 0 56 56" width="100%" height="100%">
+      <ellipse cx="14" cy="16" rx="7" ry="9" fill="#E8DCC4"/>
+      <ellipse cx="42" cy="16" rx="7" ry="9" fill="#E8DCC4"/>
+      <ellipse cx="14" cy="17" rx="4" ry="5" fill="#C98A2C"/>
+      <ellipse cx="42" cy="17" rx="4" ry="5" fill="#C98A2C"/>
+      <ellipse cx="28" cy="30" rx="22" ry="20" fill="#E8DCC4"/>
+      <circle cx="22" cy="29" r="9" fill="#fff"/>
+      <circle cx="34" cy="29" r="9" fill="#fff"/>
+      ${eyes}
+      <path d="M28 33 L24.5 39 L31.5 39 Z" fill="#C98A2C"/>
+      <ellipse cx="28" cy="47" rx="10" ry="4" fill="#D63447" opacity="0.85"/>
+    </svg>
+  `;
+}
+
+// 達成率が100%まであと1単元、という一番「あと少し」な組み合わせを探す
+function findNearestMilestone(profile) {
+  let best = null;
+  GRADE_ORDER.forEach(grade => {
+    const { bySubject } = computeGradeAchievement(profile, grade);
+    RADAR_SUBJECT_ORDER.forEach(subject => {
+      const b = bySubject[subject];
+      if (b.total > 1 && b.perfect > 0 && b.perfect < b.total) {
+        const remain = b.total - b.perfect;
+        if (!best || remain < best.remain) best = { remain, subject, grade };
+      }
+    });
+  });
+  if (!best) return null;
+  return `${GRADE_LABEL[best.grade]}の${SUBJECT_LABEL[best.subject]}、あと${best.remain}単元で達成率100%だよ！`;
+}
+
+function getMascotMessage(profile) {
+  const raw = localStorage.getItem(`kd-last-record-${profile}`);
+  if (!raw) {
+    return { mood: 'welcome', text: 'はじめまして！いっしょに「まなび道場」でがんばろう！' };
+  }
+  let r = null;
+  try { r = JSON.parse(raw); } catch (e) { r = null; }
+
+  if (r && typeof r.timestamp === 'number') {
+    const daysSince = Math.floor((Date.now() - r.timestamp) / 86400000);
+    if (daysSince >= 3) {
+      return { mood: 'welcome', text: `おかえりなさい！${daysSince}日ぶりだね、待ってたよ。` };
+    }
+  }
+  const streak = loadStreak(profile);
+  if (streak.justExtendedToday && streak.count >= 2) {
+    return { mood: 'happy', text: `${streak.count}日連続プレイだね！すごい、その調子！` };
+  }
+  if (r && r.total > 0 && r.correct === r.total) {
+    return { mood: 'happy', text: `前回は${r.category}で全問正解だったね！すごいよ！` };
+  }
+  const milestone = findNearestMilestone(profile);
+  if (milestone) return { mood: 'normal', text: milestone };
+
+  const pick = MASCOT_GENERIC_MESSAGES[Math.floor(Math.random() * MASCOT_GENERIC_MESSAGES.length)];
+  return { mood: 'normal', text: pick };
+}
+
+function renderMascotHome() {
+  if (!state.profile) return;
+  const { mood, text } = getMascotMessage(state.profile);
+  document.getElementById('mascotHomeAvatar').innerHTML = mascotSVG(mood);
+  document.getElementById('mascotHomeMessage').textContent = text;
+  renderStreakBadge();
+}
+
+/* ---------- 連続プレイ日数（ストリーク） ---------- */
+function todayDateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function dateStrDaysAgo(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function loadStreak(profile) {
+  try {
+    return JSON.parse(localStorage.getItem(`kd-streak-${profile}`)) || { count: 0, lastDate: null, justExtendedToday: false };
+  } catch (e) {
+    return { count: 0, lastDate: null, justExtendedToday: false };
+  }
+}
+
+// 通常モードのクイズを1回終えるたびに呼ぶ。同じ日に何度解いても加算されない。
+function updateStreak(profile) {
+  const streak = loadStreak(profile);
+  const today = todayDateStr();
+  if (streak.lastDate === today) {
+    streak.justExtendedToday = false; // 今日はすでに反映済み
+    localStorage.setItem(`kd-streak-${profile}`, JSON.stringify(streak));
+    return streak;
+  }
+  if (streak.lastDate === dateStrDaysAgo(1)) {
+    streak.count += 1;
+  } else {
+    streak.count = 1;
+  }
+  streak.lastDate = today;
+  streak.justExtendedToday = true;
+  localStorage.setItem(`kd-streak-${profile}`, JSON.stringify(streak));
+  return streak;
+}
+
+function renderStreakBadge() {
+  const el = document.getElementById('streakBadge');
+  if (!el) return;
+  const streak = loadStreak(state.profile);
+  if (streak.count >= 2 && (streak.lastDate === todayDateStr() || streak.lastDate === dateStrDaysAgo(1))) {
+    el.style.display = 'inline-flex';
+    el.textContent = `🔥 ${streak.count}日連続`;
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+/* ---------- 苦手問題の永続化 ---------- */
+// 数学（自動生成・checker関数を持つ）は保存できないため対象外。
+// 国語・理科・社会・英語の4択問題（type:'choice'）のみを対象にする。
+function loadWeakList(profile) {
+  try {
+    return JSON.parse(localStorage.getItem(`kd-weak-${profile}`)) || [];
+  } catch (e) {
+    return [];
+  }
+}
+function saveWeakList(profile, list) {
+  localStorage.setItem(`kd-weak-${profile}`, JSON.stringify(list));
+}
+function addToWeakList(profile, catId, catName, q) {
+  if (q.type !== 'choice') return;
+  const list = loadWeakList(profile);
+  const idx = list.findIndex(w => w.catId === catId && w.qHTML === q.qHTML);
+  if (idx >= 0) {
+    list[idx].missCount = (list[idx].missCount || 1) + 1;
+    list[idx].lastMissed = Date.now();
+    list[idx].choices = q.choices.slice();
+    list[idx].correct = q.correct;
+  } else {
+    list.push({
+      catId, catName,
+      qHTML: q.qHTML,
+      choices: q.choices.slice(),
+      correct: q.correct,
+      missCount: 1,
+      lastMissed: Date.now()
+    });
+  }
+  saveWeakList(profile, list);
+}
+function removeFromWeakList(profile, catId, qHTML) {
+  const list = loadWeakList(profile);
+  const next = list.filter(w => !(w.catId === catId && w.qHTML === qHTML));
+  if (next.length !== list.length) saveWeakList(profile, next);
+}
+
+function startWeakReview() {
+  playClick();
+  const list = loadWeakList(state.profile);
+  if (list.length === 0) return;
+  const picked = shuffleArray(list).slice(0, Math.min(10, list.length));
+  state.subject = null;
+  state.catId = `weak_${state.profile}`;
+  state.catName = 'にがて克服';
+  state.mode = 'weak';
+  state.activeBank = null;
+  state.sessionQueue = picked.map(item => ({
+    type: 'choice',
+    qHTML: item.qHTML,
+    choices: item.choices.slice(),
+    correct: item.correct,
+    _origCatId: item.catId,
+    _origCatName: item.catName
+  }));
+  state.qIndex = 0;
+  state.correctCount = 0;
+  state.total = state.sessionQueue.length;
+  state.missed = [];
+  state.reviewQueue = [];
+  document.getElementById('qReviewBadge').style.display = 'none';
+  showScreen('quiz');
+  nextQuestion();
+  startTimer();
+}
+
+function renderWeakButton() {
+  const btn = document.getElementById('weakReviewBtn');
+  if (!btn) return;
+  const count = loadWeakList(state.profile).length;
+  if (count > 0) {
+    btn.style.display = 'flex';
+    btn.textContent = `🎯 にがてを克服する（${count}問）`;
+  } else {
+    btn.style.display = 'none';
+  }
 }
 
 // rates: [算,国,理,社,英] の順で 0〜1 の配列
@@ -475,11 +703,21 @@ function startQuiz(catId) {
 
 // 「単元固定の問題プールから10問サンプリングして出題する」系のクイズ共通処理。
 // 国語・理科・社会・英語の各単元がすべてこれを使う。
+// 出題の重み付け：この単元の苦手リストにある問題があれば優先的に混ぜる（最大4問）。
 function startBankQuiz(catId, catName, bank) {
   state.catId = catId;
   state.catName = catName;
   state.activeBank = bank;
-  const picked = shuffleArray(bank).slice(0, Math.min(10, bank.length));
+
+  const weakQHTMLs = new Set(loadWeakList(state.profile).filter(w => w.catId === catId).map(w => w.qHTML));
+  const weakItems = bank.filter(q => weakQHTMLs.has(q.qHTML));
+  const restItems = bank.filter(q => !weakQHTMLs.has(q.qHTML));
+
+  const weakSlots = Math.min(4, weakItems.length, 10);
+  const chosenWeak = shuffleArray(weakItems).slice(0, weakSlots);
+  const chosenRest = shuffleArray(restItems).slice(0, Math.min(10 - chosenWeak.length, restItems.length));
+  const picked = shuffleArray([...chosenWeak, ...chosenRest]);
+
   state.sessionQueue = picked.map(cloneShuffled);
   state.mode = 'normal';
   state.qIndex = 0;
@@ -496,6 +734,7 @@ function startBankQuiz(catId, catName, bank) {
 function retrySameCategory() {
   playClick();
   if (state.subject === 'math') startQuiz(state.catId);
+  else if (state.mode === 'weak') startWeakReview();
   else startBankQuiz(state.catId, state.catName, state.activeBank);
 }
 
@@ -624,8 +863,15 @@ function submitChoice(idx) {
 }
 
 function handleResult(ok) {
-  if (ok) state.correctCount++;
-  else state.missed.push(state.current);
+  const cid = state.current._origCatId || state.catId;
+  const cname = state.current._origCatName || state.catName;
+  if (ok) {
+    state.correctCount++;
+    if (state.current.type === 'choice') removeFromWeakList(state.profile, cid, state.current.qHTML);
+  } else {
+    state.missed.push(state.current);
+    if (state.current.type === 'choice') addToWeakList(state.profile, cid, cname, state.current);
+  }
   showMark(ok);
   playResultSound(ok);
   const correctDisplay =
@@ -656,11 +902,13 @@ function finishQuiz() {
   clearInterval(state.timerHandle);
   const rankIdx = state.correctCount;
   const isReview = state.mode === 'review';
+  const isWeak = state.mode === 'weak';
+  const isScored = state.mode === 'normal'; // 復習・にがて克服は段位/累計統計の対象外
   const isPerfect = state.total > 0 && state.correctCount === state.total;
 
   if (isPerfect) playFanfare();
 
-  if (!isReview) {
+  if (isScored) {
     const prevBest = parseInt(localStorage.getItem(`kd-best-${state.profile}-${state.catId}`) || '-1');
     if (rankIdx > prevBest) localStorage.setItem(`kd-best-${state.profile}-${state.catId}`, rankIdx);
 
@@ -676,6 +924,9 @@ function finishQuiz() {
     stats.correct = (stats.correct || 0) + state.correctCount;
     stats.sessions = (stats.sessions || 0) + 1;
     localStorage.setItem(statsKey, JSON.stringify(stats));
+
+    // 連続プレイ日数の更新（通常モードの1セッション完了のみでカウント）
+    updateStreak(state.profile);
   }
 
   const today = new Date();
@@ -685,19 +936,24 @@ function finishQuiz() {
     `kd-last-record-${state.profile}`,
     JSON.stringify({
       date: dateStr,
-      grade: GRADE_LABEL[state.grade],
-      category: `${SUBJECT_LABEL[state.subject]}「${state.catName}」`,
+      timestamp: Date.now(),
+      grade: state.grade ? GRADE_LABEL[state.grade] : '',
+      category: state.subject ? `${SUBJECT_LABEL[state.subject]}「${state.catName}」` : state.catName,
       correct: state.correctCount,
       total: state.total,
-      review: isReview
+      review: isReview,
+      weak: isWeak
     })
   );
 
-  document.getElementById('certEyebrow').textContent = isReview ? 'REVIEW COMPLETE' : 'CERTIFICATE OF ACHIEVEMENT';
-  document.getElementById('certTitle').textContent = isReview ? '復習けっか' : '認定証';
+  const modeLabel = isWeak ? 'にがて克服' : isReview ? '復習' : '';
+  document.getElementById('certEyebrow').textContent = isScored ? 'CERTIFICATE OF ACHIEVEMENT' : (isWeak ? 'WEAK POINT TRAINING' : 'REVIEW COMPLETE');
+  document.getElementById('certTitle').textContent = isWeak ? 'にがて克服けっか' : isReview ? '復習けっか' : '認定証';
   document.getElementById('certName').textContent = state.profile;
-  document.getElementById('certRank').textContent = isReview ? `${state.correctCount}/${state.total} 正解` : RANKS[rankIdx];
-  document.getElementById('certMeta').innerHTML = `${SUBJECT_LABEL[state.subject]}　${GRADE_LABEL[state.grade]}「${state.catName}」${isReview ? '（復習）' : ''}<br>${state.correctCount} / ${state.total} 問正解<br>${dateStr}`;
+  document.getElementById('certRank').textContent = isScored ? RANKS[rankIdx] : `${state.correctCount}/${state.total} 正解`;
+  document.getElementById('certMeta').innerHTML = isScored
+    ? `${SUBJECT_LABEL[state.subject]}　${GRADE_LABEL[state.grade]}「${state.catName}」<br>${state.correctCount} / ${state.total} 問正解<br>${dateStr}`
+    : `${state.catName}${modeLabel ? `（${modeLabel}）` : ''}<br>${state.correctCount} / ${state.total} 問正解<br>${dateStr}`;
 
   const reviewBtn = document.getElementById('reviewBtn');
   if (state.missed.length > 0) {
@@ -724,7 +980,8 @@ function renderLastRecord() {
   try {
     const r = JSON.parse(raw);
     box.style.display = 'block';
-    box.innerHTML = `前回の記録：<b>${r.date}</b>　${r.grade}　${r.category}${r.review ? '（復習）' : ''}　<b>${r.correct}/${r.total}</b>問正解`;
+    const modeLabel = r.weak ? '（にがて克服）' : r.review ? '（復習）' : '';
+    box.innerHTML = `前回の記録：<b>${r.date}</b>　${r.grade || ''}　${r.category}${modeLabel}　<b>${r.correct}/${r.total}</b>問正解`;
   } catch (e) {
     box.style.display = 'none';
   }
