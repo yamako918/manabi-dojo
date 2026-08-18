@@ -121,6 +121,8 @@ function deleteProfile(name) {
   localStorage.removeItem(`kd-last-record-${name}`);
   localStorage.removeItem(`kd-weak-${name}`);
   localStorage.removeItem(`kd-streak-${name}`);
+  localStorage.removeItem(`kd-weak-cleared-${name}`);
+  localStorage.removeItem(`kd-badges-${name}`);
   Object.keys(localStorage).forEach(k => {
     if (k.startsWith(`kd-best-${name}-`) || k.startsWith(`kd-stats-${name}-`)) localStorage.removeItem(k);
   });
@@ -146,6 +148,7 @@ function showScreen(name) {
   }
   if (name === 'records') renderRecords();
   if (name === 'achievement') renderAchievement();
+  if (name === 'badges') renderBadgeScreen();
 }
 
 function goToRecords() {
@@ -452,7 +455,103 @@ function addToWeakList(profile, catId, catName, q) {
 function removeFromWeakList(profile, catId, qHTML) {
   const list = loadWeakList(profile);
   const next = list.filter(w => !(w.catId === catId && w.qHTML === qHTML));
-  if (next.length !== list.length) saveWeakList(profile, next);
+  if (next.length !== list.length) {
+    saveWeakList(profile, next);
+    const key = `kd-weak-cleared-${profile}`;
+    const count = parseInt(localStorage.getItem(key) || '0', 10) + 1;
+    localStorage.setItem(key, String(count));
+  }
+}
+
+/* ---------- 実績バッジ ---------- */
+const BADGE_DEFS = [
+  { id: 'first_quiz', name: 'はじめの一歩', desc: 'はじめてクイズに挑戦した', icon: '🥉',
+    check: ctx => ctx.hasLastRecord },
+  { id: 'first_perfect', name: 'はじめての三段', desc: 'どれか1つの単元で三段（全問正解）を達成', icon: '🏅',
+    check: ctx => ctx.perfectCount >= 1 },
+  { id: 'perfect_5', name: '三段コレクター', desc: '5つの単元で三段を達成', icon: '🌟',
+    check: ctx => ctx.perfectCount >= 5 },
+  { id: 'perfect_15', name: '三段マスター', desc: '15の単元で三段を達成', icon: '👑',
+    check: ctx => ctx.perfectCount >= 15 },
+  { id: 'streak_3', name: '続けるって大事', desc: '3日連続でプレイした', icon: '🔥',
+    check: ctx => ctx.streakCount >= 3 },
+  { id: 'streak_7', name: '継続は力なり', desc: '7日連続でプレイした', icon: '🔥🔥',
+    check: ctx => ctx.streakCount >= 7 },
+  { id: 'correct_100', name: '百問正解', desc: '累計100問正解した', icon: '💯',
+    check: ctx => ctx.totalCorrect >= 100 },
+  { id: 'correct_300', name: '三百問正解', desc: '累計300問正解した', icon: '💯💯',
+    check: ctx => ctx.totalCorrect >= 300 },
+  { id: 'weak_clear_1', name: 'にがて克服デビュー', desc: '苦手だった問題を1問克服した', icon: '🎯',
+    check: ctx => ctx.weakCleared >= 1 },
+  { id: 'weak_clear_10', name: 'にがて克服マスター', desc: '苦手だった問題を10問克服した', icon: '🎯🎯',
+    check: ctx => ctx.weakCleared >= 10 },
+  { id: 'all_subjects', name: '5教科チャレンジャー', desc: '5教科すべてに挑戦した', icon: '🌈',
+    check: ctx => ctx.subjectsPlayed >= 5 },
+];
+
+function loadBadges(profile) {
+  try { return JSON.parse(localStorage.getItem(`kd-badges-${profile}`)) || []; }
+  catch (e) { return []; }
+}
+function saveBadges(profile, list) {
+  localStorage.setItem(`kd-badges-${profile}`, JSON.stringify(list));
+}
+
+function buildBadgeContext(profile) {
+  const hasLastRecord = !!localStorage.getItem(`kd-last-record-${profile}`);
+  const streak = loadStreak(profile);
+  let perfectCount = 0, totalCorrect = 0;
+  const subjectsSeen = new Set();
+  getAllCatDefs().forEach(d => {
+    const bestIdx = parseInt(localStorage.getItem(`kd-best-${profile}-${d.catId}`) || '-1', 10);
+    if (bestIdx === PERFECT_RANK_IDX) perfectCount++;
+    let stats = null;
+    try { stats = JSON.parse(localStorage.getItem(`kd-stats-${profile}-${d.catId}`)); } catch (e) { stats = null; }
+    if (stats) {
+      totalCorrect += stats.correct || 0;
+      subjectsSeen.add(d.subject);
+    }
+  });
+  const weakCleared = parseInt(localStorage.getItem(`kd-weak-cleared-${profile}`) || '0', 10);
+  return { hasLastRecord, streakCount: streak.count, perfectCount, totalCorrect, subjectsPlayed: subjectsSeen.size, weakCleared };
+}
+
+// 新たに条件を満たしたバッジを付与し、そのリストを返す
+function checkAndAwardBadges(profile) {
+  const earned = loadBadges(profile);
+  const ctx = buildBadgeContext(profile);
+  const newlyEarned = [];
+  BADGE_DEFS.forEach(b => {
+    if (!earned.includes(b.id) && b.check(ctx)) {
+      earned.push(b.id);
+      newlyEarned.push(b);
+    }
+  });
+  if (newlyEarned.length > 0) saveBadges(profile, earned);
+  return newlyEarned;
+}
+
+function renderBadgeScreen() {
+  const wrap = document.getElementById('badgeGrid');
+  wrap.innerHTML = '';
+  const earned = new Set(loadBadges(state.profile));
+  BADGE_DEFS.forEach(b => {
+    const got = earned.has(b.id);
+    const card = document.createElement('div');
+    card.className = 'badge-card' + (got ? ' badge-earned' : ' badge-locked');
+    card.innerHTML = `
+      <div class="badge-icon">${got ? b.icon : '🔒'}</div>
+      <div class="badge-name">${b.name}</div>
+      <div class="badge-desc">${b.desc}</div>
+    `;
+    wrap.appendChild(card);
+  });
+  document.getElementById('badgeSummary').textContent = `獲得数：${earned.size} / ${BADGE_DEFS.length}`;
+}
+
+function goToBadges() {
+  playClick();
+  showScreen('badges');
 }
 
 function startWeakReview() {
@@ -709,14 +808,24 @@ function startBankQuiz(catId, catName, bank) {
   state.catName = catName;
   state.activeBank = bank;
 
+  const targetTotal = Math.min(10, bank.length);
   const weakQHTMLs = new Set(loadWeakList(state.profile).filter(w => w.catId === catId).map(w => w.qHTML));
   const weakItems = bank.filter(q => weakQHTMLs.has(q.qHTML));
   const restItems = bank.filter(q => !weakQHTMLs.has(q.qHTML));
 
-  const weakSlots = Math.min(4, weakItems.length, 10);
+  const weakSlots = Math.min(4, weakItems.length);
   const chosenWeak = shuffleArray(weakItems).slice(0, weakSlots);
-  const chosenRest = shuffleArray(restItems).slice(0, Math.min(10 - chosenWeak.length, restItems.length));
-  const picked = shuffleArray([...chosenWeak, ...chosenRest]);
+  const chosenRest = shuffleArray(restItems).slice(0, targetTotal - chosenWeak.length);
+  let picked = [...chosenWeak, ...chosenRest];
+
+  // 苦手問題が多く、restItems だけでは targetTotal に届かない場合は
+  // 残りの苦手問題（4問の枠を超えた分）で埋める（必ず10問＝段位満点の基準を保つため）
+  if (picked.length < targetTotal) {
+    const usedQHTMLs = new Set(picked.map(q => q.qHTML));
+    const extraWeak = shuffleArray(weakItems.filter(q => !usedQHTMLs.has(q.qHTML)));
+    picked = picked.concat(extraWeak.slice(0, targetTotal - picked.length));
+  }
+  picked = shuffleArray(picked);
 
   state.sessionQueue = picked.map(cloneShuffled);
   state.mode = 'normal';
@@ -961,6 +1070,19 @@ function finishQuiz() {
     reviewBtn.textContent = `まちがえた問題を復習する（${state.missed.length}問）`;
   } else {
     reviewBtn.style.display = 'none';
+  }
+
+  // 実績バッジの判定（累計データに基づくため、モードを問わず毎回チェックする）
+  const newBadges = checkAndAwardBadges(state.profile);
+  const badgeNotice = document.getElementById('newBadgeNotice');
+  if (newBadges.length > 0) {
+    badgeNotice.style.display = 'block';
+    badgeNotice.innerHTML = newBadges
+      .map(b => `<div class="new-badge-line">${b.icon} 新しいバッジ「${b.name}」を獲得！</div>`)
+      .join('');
+  } else {
+    badgeNotice.style.display = 'none';
+    badgeNotice.innerHTML = '';
   }
 
   showScreen('result');
