@@ -1182,8 +1182,50 @@ function renderLastRecord() {
 /* ---------- 初期化 ---------- */
 renderProfileList();
 
+/* ---------- PWA更新の検知・反映 ----------
+   GitHub Pagesはsw.js自体にキャッシュ無効化のHTTPヘッダーを付けられないため、
+   特にiOSのSafari（ホーム画面追加時）で更新に気づきにくいことがある。
+   新しいバージョンを検知したら画面上部にバナーを出し、
+   タップで即座に新しいsw.jsへ切り替えて再読み込みする。 */
+function showUpdateBanner(registration) {
+  const banner = document.getElementById('updateBanner');
+  if (!banner) return;
+  banner.style.display = 'flex';
+  banner.onclick = () => applyUpdate(registration);
+}
+
+function applyUpdate(registration) {
+  if (!registration || !registration.waiting) {
+    window.location.reload();
+    return;
+  }
+  registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+}
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker
+      .register('sw.js')
+      .then(reg => {
+        // ページを開くたびに新しいsw.jsが無いか能動的に確認する
+        reg.update().catch(() => {});
+
+        // 既に新しいsw.jsが「待機中」の場合（ページを開いた直後に検知）
+        if (reg.waiting) showUpdateBanner(reg);
+
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (!newWorker) return;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              showUpdateBanner(reg);
+            }
+          });
+        });
+      })
+      .catch(() => {});
   });
 }

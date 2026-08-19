@@ -48,7 +48,14 @@
     max-width:480px;
     margin:0 auto;
     min-height:100vh;
-    padding:20px 18px 40px;
+    /* PWA（ホーム画面追加）でURLバーが消えた分、ノッチ・ステータスバー分の
+       セーフエリアを確保する。通常のSafariタブ表示ではenv()が0になるだけなので
+       見た目は変わらない。 */
+    padding:
+      calc(20px + env(safe-area-inset-top))
+      calc(18px + env(safe-area-inset-right))
+      calc(40px + env(safe-area-inset-bottom))
+      calc(18px + env(safe-area-inset-left));
     display:flex;
     flex-direction:column;
     position:relative;
@@ -63,6 +70,12 @@
     position:absolute; top:0; right:0; width:36px; height:36px; border-radius:50%;
     background:var(--card); border:1px solid rgba(31,58,95,0.15);
     font-size:15px; cursor:pointer; box-shadow:var(--shadow);
+  }
+  .update-banner{
+    display:flex; align-items:center; justify-content:center;
+    background:var(--red); color:#fff; font-weight:700; font-size:13px;
+    padding:10px 14px; border-radius:10px; margin-bottom:12px;
+    cursor:pointer; box-shadow:var(--shadow);
   }
   .screen{ display:none; flex-direction:column; gap:14px; animation: fadeIn .25s ease; }
   .screen.active{ display:flex; }
@@ -311,6 +324,9 @@
 </head>
 <body>
 <div id="app">
+  <div class="update-banner" id="updateBanner" style="display:none;">
+    🔄 新しいバージョンがあります。タップして更新
+  </div>
   <div class="brand">
     <button class="bgm-toggle" id="bgmToggle" onclick="toggleBGM()">🔊</button>
     <h1>まなび道場</h1>

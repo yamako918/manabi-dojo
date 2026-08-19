@@ -17,7 +17,7 @@ let audioCtx = null,
 // BGMの各楽器の音量（-11〜-14dB程度）にこの値を重ねて、確実にBGMの方が
 // 控えめに聞こえるようにしている。数値を 0 に近づけると音量UP、
 // マイナス方向に大きくすると音量DOWN。
-const BGM_MASTER_DB = -28;
+const BGM_MASTER_DB = -16;
 
 function ensureAudio() {
   if (!audioCtx) {

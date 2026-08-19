@@ -107,15 +107,18 @@ async function loadNewCheers(profile) {
   const lastSeenKey = `kd-cheers-lastseen-${profile}`;
   const lastSeen = parseInt(localStorage.getItem(lastSeenKey) || '0', 10);
   try {
+    // where + orderBy の組み合わせは複合インデックスが必要になるため、
+    // あえて orderBy を使わず取得してからJS側でソートする（設定不要にするため）
     const snap = await cloudDb
       .collection('cheers')
       .where('to', '==', profile)
-      .orderBy('sentAt', 'desc')
-      .limit(20)
+      .limit(50)
       .get();
     const all = snap.docs
       .map(d => d.data())
-      .filter(c => c.sentAt); // サーバー確定前の一時データを除外
+      .filter(c => c.sentAt) // サーバー確定前の一時データを除外
+      .sort((a, b) => b.sentAt.toMillis() - a.sentAt.toMillis())
+      .slice(0, 20);
 
     if (all.length > 0) {
       const newest = all[0].sentAt.toMillis();
@@ -123,7 +126,7 @@ async function loadNewCheers(profile) {
     }
     return all.filter(c => c.sentAt.toMillis() > lastSeen);
   } catch (e) {
-    console.warn('応援の取得に失敗しました（Firestoreの複合インデックス作成が必要な場合があります）:', e);
+    console.warn('応援の取得に失敗しました:', e);
     return [];
   }
 }
