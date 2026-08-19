@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'manabi-dojo-v19';
+﻿const CACHE_NAME = 'manabi-dojo-v20';
 const ASSETS = [
   './',
   './index.html',
