@@ -955,6 +955,81 @@ function currentCatDef() {
   return CATEGORIES[state.grade].find(c => c.id === state.catId);
 }
 
+/* ---------- けいさんメモ（手書きスクラッチパッド） ---------- */
+let scratchCtx = null;
+let scratchInitialized = false;
+let scratchDrawing = false;
+let scratchLastX = 0;
+let scratchLastY = 0;
+
+function scratchPos(e, canvas) {
+  const rect = canvas.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+function scratchStart(e) {
+  scratchDrawing = true;
+  const pos = scratchPos(e, e.currentTarget);
+  scratchLastX = pos.x;
+  scratchLastY = pos.y;
+  e.preventDefault();
+}
+
+function scratchMove(e) {
+  if (!scratchDrawing || !scratchCtx) return;
+  const pos = scratchPos(e, e.currentTarget);
+  scratchCtx.beginPath();
+  scratchCtx.moveTo(scratchLastX, scratchLastY);
+  scratchCtx.lineTo(pos.x, pos.y);
+  scratchCtx.stroke();
+  scratchLastX = pos.x;
+  scratchLastY = pos.y;
+  e.preventDefault();
+}
+
+function scratchEnd() {
+  scratchDrawing = false;
+}
+
+function initScratchpad() {
+  if (scratchInitialized) return;
+  const canvas = document.getElementById('scratchCanvas');
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width === 0) return; // まだ表示されておらず幅が取れない場合は次回に持ち越す
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  scratchCtx = canvas.getContext('2d');
+  scratchCtx.scale(dpr, dpr);
+  scratchCtx.strokeStyle = '#1F3A5F';
+  scratchCtx.lineWidth = 2.4;
+  scratchCtx.lineCap = 'round';
+  scratchCtx.lineJoin = 'round';
+
+  canvas.addEventListener('pointerdown', scratchStart);
+  canvas.addEventListener('pointermove', scratchMove);
+  canvas.addEventListener('pointerup', scratchEnd);
+  canvas.addEventListener('pointerleave', scratchEnd);
+  canvas.addEventListener('pointercancel', scratchEnd);
+
+  scratchInitialized = true;
+}
+
+function resetScratchCanvas() {
+  const canvas = document.getElementById('scratchCanvas');
+  if (!canvas || !scratchCtx) return;
+  scratchCtx.save();
+  scratchCtx.setTransform(1, 0, 0, 1, 0, 0);
+  scratchCtx.clearRect(0, 0, canvas.width, canvas.height);
+  scratchCtx.restore();
+}
+
+function clearScratchpad() {
+  playClick();
+  resetScratchCanvas();
+}
+
 function nextQuestion() {
   state.locked = false;
   if (state.qIndex >= state.total) {
@@ -984,12 +1059,14 @@ function nextQuestion() {
   const helperBtns = document.getElementById('helperBtns');
   const choiceGrid = document.getElementById('choiceGrid');
   const input = document.getElementById('answerInput');
+  const scratchpadWrap = document.getElementById('scratchpadWrap');
 
   if (q.type === 'choice') {
     answerRow.style.display = 'none';
     helperBtns.style.display = 'none';
     choiceGrid.style.display = 'flex';
     choiceGrid.innerHTML = '';
+    scratchpadWrap.style.display = 'none';
     q.choices.forEach((c, i) => {
       const b = document.createElement('button');
       b.className = 'choice-btn';
@@ -1014,6 +1091,11 @@ function nextQuestion() {
       };
       helperBtns.appendChild(btn);
     });
+
+    // 算数（自由記述の計算問題）のときだけ、ひっ算・計算メモ欄を表示する
+    scratchpadWrap.style.display = 'block';
+    initScratchpad();
+    resetScratchCanvas();
   }
 }
 

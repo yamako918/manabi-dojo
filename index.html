@@ -246,6 +246,28 @@
     border:1px solid rgba(31,58,95,0.2); background:var(--card); color:var(--ink);
   }
 
+  .scratchpad-wrap{
+    background:var(--card); border-radius:10px; border:1px solid rgba(31,58,95,0.15);
+    box-shadow:var(--shadow); overflow:hidden;
+  }
+  .scratchpad-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:7px 10px; font-size:11.5px; color:var(--ink-soft);
+    border-bottom:1px solid rgba(31,58,95,0.1);
+  }
+  .scratchpad-header button{
+    font-family:inherit; font-size:11.5px; padding:4px 10px; border-radius:7px;
+    border:1px solid rgba(31,58,95,0.2); background:var(--paper); color:var(--ink);
+    cursor:pointer;
+  }
+  #scratchCanvas{
+    display:block; width:100%; height:170px; touch-action:none;
+    background-color:var(--paper);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(31,58,95,0.08) 0 1px, transparent 1px 20px),
+      repeating-linear-gradient(90deg, rgba(31,58,95,0.08) 0 1px, transparent 1px 20px);
+  }
+
   .choice-grid{ display:flex; flex-direction:column; gap:9px; }
   .choice-btn{
     background:var(--card); border:2px solid rgba(31,58,95,0.15); border-radius:10px;
@@ -467,6 +489,15 @@
       </div>
       <div class="helper-btns" id="helperBtns"></div>
       <div class="choice-grid" id="choiceGrid" style="display:none;"></div>
+
+      <div class="scratchpad-wrap" id="scratchpadWrap" style="display:none;">
+        <div class="scratchpad-header">
+          <span>✏️ ひっ算・けいさんメモ</span>
+          <button onclick="clearScratchpad()">けす</button>
+        </div>
+        <canvas id="scratchCanvas"></canvas>
+      </div>
+
       <div class="feedback-text" id="feedbackText"></div>
     </div>
   </div>
