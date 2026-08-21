@@ -276,6 +276,14 @@
     cursor:pointer; text-align:left; line-height:1.4;
   }
   .choice-btn:active{ transform:scale(0.98); border-color:var(--ink); }
+  .choice-btn.choice-correct{
+    border-color:var(--green); background:rgba(63,122,86,0.14); color:var(--ink); font-weight:700;
+  }
+  .choice-btn.choice-wrong{
+    border-color:var(--red); background:rgba(214,52,71,0.12); color:var(--ink); font-weight:700;
+  }
+  .choice-btn:disabled{ cursor:default; }
+  .choice-btn:disabled:not(.choice-correct):not(.choice-wrong){ opacity:0.55; }
 
   .btn{
     font-family:inherit; font-size:16px; font-weight:700; padding:13px 16px;

@@ -1115,6 +1115,15 @@ function submitChoice(idx) {
   state.locked = true;
   playClick();
   const ok = idx === state.current.correct;
+
+  // 選んだ答え・正解のボタンを見た目で強調し、それ以外は押せなくする
+  const buttons = document.querySelectorAll('#choiceGrid .choice-btn');
+  buttons.forEach((btn, i) => {
+    btn.disabled = true;
+    if (i === state.current.correct) btn.classList.add('choice-correct');
+    if (i === idx) btn.classList.add(ok ? 'choice-correct' : 'choice-wrong');
+  });
+
   handleResult(ok);
 }
 
@@ -1137,7 +1146,7 @@ function handleResult(ok) {
     ? `<span style="color:var(--green); font-weight:700;">せいかい！</span>`
     : `正解は <b>${correctDisplay}</b> でした`;
   state.qIndex++;
-  setTimeout(nextQuestion, ok ? 700 : 1600);
+  setTimeout(nextQuestion, ok ? 700 : 2400);
 }
 
 document.getElementById('answerInput').addEventListener('keydown', e => {
