@@ -408,31 +408,44 @@
     </div>
     <div class="cheer-notice" id="cheerNotice" style="display:none;"></div>
 
-    <div class="grade-card" style="--stripe:#1F3A5F;" onclick="selectSubject('math')">
-      <div class="kanji">算</div>
-      <h2>算数・数学</h2>
-      <p>計算問題（自動生成・無限に挑戦できます）</p>
+    <button class="btn btn-outline" id="towerToggleBtn" style="display:none;" onclick="toggleFieldOutside()">🚪 道場からでる</button>
+
+    <div id="subjectCardsWrap" style="display:flex; flex-direction:column; gap:14px;">
+      <div class="grade-card" style="--stripe:#1F3A5F;" onclick="selectSubject('math')">
+        <div class="kanji">算</div>
+        <h2>算数・数学</h2>
+        <p>計算問題（自動生成・無限に挑戦できます）</p>
+      </div>
+      <div class="grade-card" style="--stripe:#7A4B6B;" onclick="selectSubject('kokugo')">
+        <div class="kanji">国</div>
+        <h2>国語（漢字・語彙）</h2>
+        <p>漢字の読み書き・熟語・ことわざ</p>
+      </div>
+      <div class="grade-card" style="--stripe:#2E7D6B;" onclick="selectSubject('science')">
+        <div class="kanji">理</div>
+        <h2>理科</h2>
+        <p>一問一答クイズ</p>
+      </div>
+      <div class="grade-card" style="--stripe:#A66A2E;" onclick="selectSubject('social')">
+        <div class="kanji">社</div>
+        <h2>社会</h2>
+        <p>地理・歴史・公民の一問一答</p>
+      </div>
+      <div class="grade-card" style="--stripe:#4A5FA8;" onclick="selectSubject('english')">
+        <div class="kanji">英</div>
+        <h2>英語</h2>
+        <p>単語・文法の一問一答</p>
+      </div>
     </div>
-    <div class="grade-card" style="--stripe:#7A4B6B;" onclick="selectSubject('kokugo')">
-      <div class="kanji">国</div>
-      <h2>国語（漢字・語彙）</h2>
-      <p>漢字の読み書き・熟語・ことわざ</p>
+
+    <div id="towerEntryWrap" style="display:none;">
+      <div class="grade-card" style="--stripe:#7A2E8A;" onclick="playClick();showScreen('tower-subject');">
+        <div class="kanji">塔</div>
+        <h2>文明の塔</h2>
+        <p>科目ごとの塔に挑戦し、最上階を目指そう</p>
+      </div>
     </div>
-    <div class="grade-card" style="--stripe:#2E7D6B;" onclick="selectSubject('science')">
-      <div class="kanji">理</div>
-      <h2>理科</h2>
-      <p>一問一答クイズ</p>
-    </div>
-    <div class="grade-card" style="--stripe:#A66A2E;" onclick="selectSubject('social')">
-      <div class="kanji">社</div>
-      <h2>社会</h2>
-      <p>地理・歴史・公民の一問一答</p>
-    </div>
-    <div class="grade-card" style="--stripe:#4A5FA8;" onclick="selectSubject('english')">
-      <div class="kanji">英</div>
-      <h2>英語</h2>
-      <p>単語・文法の一問一答</p>
-    </div>
+
     <div class="last-record" id="lastRecord" style="display:none;"></div>
     <div class="footnote">1回10問・全問終わると段位認定証がもらえます</div>
   </div>
@@ -476,11 +489,59 @@
     <div class="cat-list" id="catList"></div>
   </div>
 
+  <!-- TOWER SUBJECT: 塔（科目）選択 -->
+  <div class="screen" id="screen-tower-subject">
+    <button class="backbtn" onclick="playClick();showScreen('subjects');">もどる</button>
+    <div id="towerSubjectList" style="display:flex; flex-direction:column; gap:14px;"></div>
+  </div>
+
+  <!-- TOWER DIFFICULTY: 難易度選択 -->
+  <div class="screen" id="screen-tower-difficulty">
+    <button class="backbtn" onclick="playClick();showScreen('tower-subject');">もどる</button>
+    <div class="grade-card" id="towerDifficultyHeader" style="cursor:default;"></div>
+    <div class="cat-list" id="towerDifficultyList"></div>
+  </div>
+
+  <!-- TOWER FLOOR CLEAR: 階クリア中間画面 -->
+  <div class="screen" id="screen-tower-floor-clear">
+    <div class="cert">
+      <div class="eyebrow">TOWER OF CIVILIZATION</div>
+      <h2 id="towerFloorClearTitle"></h2>
+      <div class="meta" id="towerFloorClearMeta"></div>
+    </div>
+    <div class="cert-actions">
+      <button class="btn btn-primary" id="towerNextFloorBtn" onclick="advanceTowerFloor()"></button>
+    </div>
+  </div>
+
+  <!-- TOWER RESULT: 挑戦けっか（制覇 or 失敗） -->
+  <div class="screen" id="screen-tower-result">
+    <div class="cert">
+      <div class="eyebrow" id="towerResultEyebrow"></div>
+      <h2 id="towerResultTitle"></h2>
+      <div class="rankwrap">
+        <div class="hanko" id="towerResultHanko">挑戦</div>
+        <div class="rankname" id="towerResultRank"></div>
+      </div>
+      <div class="meta" id="towerResultMeta"></div>
+      <div id="towerFloorBreakdown" class="record-section" style="margin-top:14px;"></div>
+      <div class="new-badge-notice" id="towerNewBadgeNotice" style="display:none;"></div>
+    </div>
+    <div class="cert-actions">
+      <button class="btn btn-review" id="towerReviewBtn" style="display:none;" onclick="reviewMissed()"></button>
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="playClick();showScreen('tower-subject');">塔の選択へ</button>
+        <button class="btn btn-primary" onclick="retryTowerRun()">もう一度挑戦</button>
+      </div>
+    </div>
+  </div>
+
   <!-- QUIZ -->
   <div class="screen" id="screen-quiz">
     <button class="backbtn" onclick="quitQuiz()">もどる</button>
     <div class="progress-row">
       <span id="qCounter">第1問 / 10</span>
+      <span id="towerLives" style="display:none;"></span>
       <span id="qTimer">00:00</span>
     </div>
     <div class="progress-bar"><div id="qProgressFill" style="width:0%"></div></div>
@@ -545,6 +606,7 @@
 <script src="js/expansion3.js"></script>
 <script src="js/expansion.js"></script>
 <script src="js/generator.js"></script>
+<script src="js/tower.js"></script>
 <script src="js/firebase-config.js"></script>
 <script src="js/cloud.js"></script>
 <script src="js/ui.js"></script>

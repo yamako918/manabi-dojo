@@ -146,11 +146,14 @@ function showScreen(name) {
     renderMascotHome();
     renderWeakButton();
     checkNewCheers();
+    updateTowerToggleVisibility();
   }
   if (name === 'records') renderRecords();
   if (name === 'achievement') renderAchievement();
   if (name === 'badges') renderBadgeScreen();
   if (name === 'leaderboard') renderLeaderboard();
+  if (name === 'tower-subject') renderTowerSubjectList();
+  if (name === 'tower-difficulty') renderTowerDifficultyScreen();
 }
 
 function goToRecords() {
@@ -420,6 +423,26 @@ function renderStreakBadge() {
   }
 }
 
+/* ---------- 通算プレイ日数（連続でなくてもよい・バッジ判定用） ---------- */
+function loadPlayDays(profile) {
+  try {
+    return JSON.parse(localStorage.getItem(`kd-playdays-${profile}`)) || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+// クイズ（通常・復習・にがて克服・文明の塔いずれも）が1回終わるたびに呼ぶ。
+// 同じ日に何度呼んでも重複加算されない。
+function recordPlayDay(profile) {
+  const days = loadPlayDays(profile);
+  const today = todayDateStr();
+  if (!days.includes(today)) {
+    days.push(today);
+    localStorage.setItem(`kd-playdays-${profile}`, JSON.stringify(days));
+  }
+}
+
 /* ---------- 苦手問題の永続化 ---------- */
 // 数学（自動生成・checker関数を持つ）は保存できないため対象外。
 // 国語・理科・社会・英語の4択問題（type:'choice'）のみを対象にする。
@@ -479,6 +502,10 @@ const BADGE_DEFS = [
     check: ctx => ctx.streakCount >= 3 },
   { id: 'streak_7', name: '継続は力なり', desc: '7日連続でプレイした', icon: '🔥🔥',
     check: ctx => ctx.streakCount >= 7 },
+  { id: 'streak_14', name: '継続の匠', desc: '14日連続でプレイした', icon: '🔥🔥🔥',
+    check: ctx => ctx.streakCount >= 14 },
+  { id: 'streak_30', name: '継続の鬼', desc: '30日連続でプレイした', icon: '🔥🔥🔥🔥',
+    check: ctx => ctx.streakCount >= 30 },
   { id: 'correct_100', name: '百問正解', desc: '累計100問正解した', icon: '💯',
     check: ctx => ctx.totalCorrect >= 100 },
   { id: 'correct_300', name: '三百問正解', desc: '累計300問正解した', icon: '💯💯',
@@ -489,7 +516,30 @@ const BADGE_DEFS = [
     check: ctx => ctx.weakCleared >= 10 },
   { id: 'all_subjects', name: '5教科チャレンジャー', desc: '5教科すべてに挑戦した', icon: '🌈',
     check: ctx => ctx.subjectsPlayed >= 5 },
+  { id: 'play_days_10', name: '道場の常連', desc: '（連続でなくてよい）累計10日プレイした', icon: '🏮',
+    check: ctx => ctx.totalPlayDays >= 10 },
+  { id: 'play_days_30', name: '道場の主', desc: '（連続でなくてよい）累計30日プレイした', icon: '⛩️',
+    check: ctx => ctx.totalPlayDays >= 30 },
+  { id: 'play_days_100', name: '生涯修行者', desc: '（連続でなくてよい）累計100日プレイした', icon: '🗻',
+    check: ctx => ctx.totalPlayDays >= 100 },
+  { id: 'early_bird', name: '早起き修行', desc: '朝6時より前にクイズに挑戦した', icon: '🌅',
+    check: ctx => ctx.hourOfCompletion < 6 },
+  { id: 'night_owl', name: '夜ふかし修行', desc: '夜23時以降にクイズに挑戦した', icon: '🌙',
+    check: ctx => ctx.hourOfCompletion >= 23 },
+  { id: 'full_pentagon', name: '五角形マスター', desc: 'いずれかの学年で5教科すべての達成率を100%にした', icon: '🔷',
+    check: ctx => ctx.fullPentagonGrade },
+  { id: 'tower_solo_clear', name: '孤高の塔登り', desc: '完璧主義（ノーミス）難易度でいずれかの塔を制覇', icon: '⚔️',
+    check: ctx => ctx.towerClearedDifficulties.has('solo') },
+  { id: 'tower_amulet_clear', name: '加護の塔登り', desc: '魔法のお守り難易度でいずれかの塔を制覇', icon: '🧿',
+    check: ctx => ctx.towerClearedDifficulties.has('amulet') },
+  { id: 'tower_unlimited_clear', name: '塔の踏破者', desc: '鋼のメンタル難易度でいずれかの塔を制覇', icon: '🏯',
+    check: ctx => ctx.towerClearedDifficulties.has('unlimited') },
+  { id: 'tower_all_subjects', name: '五塔制覇', desc: '5科目すべての塔を1つ以上の難易度で制覇した', icon: '🏰',
+    check: ctx => ctx.towerAnyClearedSubjects >= 5 },
+  { id: 'tower_master_single', name: '塔の極意', desc: 'いずれかの科目の塔を、全難易度（3種）で制覇した', icon: '💠',
+    check: ctx => ctx.towerAllDifficultySubjects >= 1 },
 ];
+
 
 function loadBadges(profile) {
   try { return JSON.parse(localStorage.getItem(`kd-badges-${profile}`)) || []; }
@@ -515,7 +565,36 @@ function buildBadgeContext(profile) {
     }
   });
   const weakCleared = parseInt(localStorage.getItem(`kd-weak-cleared-${profile}`) || '0', 10);
-  return { hasLastRecord, streakCount: streak.count, perfectCount, totalCorrect, subjectsPlayed: subjectsSeen.size, weakCleared };
+
+  const towerProgress = loadTowerProgress(profile);
+  const towerClearedDifficulties = new Set();
+  let towerAnyClearedSubjects = 0;
+  let towerAllDifficultySubjects = 0;
+  const towerDifficultyCount = Object.keys(TOWER_DIFFICULTY).length;
+  Object.values(towerProgress).forEach(p => {
+    const cleared = p.clearedDifficulties || [];
+    cleared.forEach(d => towerClearedDifficulties.add(d));
+    if (cleared.length > 0) towerAnyClearedSubjects++;
+    if (cleared.length >= towerDifficultyCount) towerAllDifficultySubjects++;
+  });
+
+  const totalPlayDays = loadPlayDays(profile).length;
+
+  // いずれかの学年で5教科すべてが三段（達成率100%）＝レーダーチャートが正五角形になったか
+  let fullPentagonGrade = false;
+  GRADE_ORDER.forEach(grade => {
+    const { totalUnits, totalPerfect } = computeGradeAchievement(profile, grade);
+    if (totalUnits > 0 && totalPerfect === totalUnits) fullPentagonGrade = true;
+  });
+
+  const hourOfCompletion = new Date().getHours();
+
+  return {
+    hasLastRecord, streakCount: streak.count, perfectCount, totalCorrect,
+    subjectsPlayed: subjectsSeen.size, weakCleared, towerClearedDifficulties,
+    totalPlayDays, towerAnyClearedSubjects, towerAllDifficultySubjects,
+    fullPentagonGrade, hourOfCompletion
+  };
 }
 
 // 新たに条件を満たしたバッジを付与し、そのリストを返す
@@ -918,6 +997,10 @@ function quitQuiz() {
   if (!confirm('クイズを中断してもどりますか？（今回の記録は保存されません）')) return;
   playClick();
   clearInterval(state.timerHandle);
+  if (state.mode === 'tower') {
+    showScreen('tower-subject');
+    return;
+  }
   if (state.subject === 'math') {
     renderCategoryList();
   } else {
@@ -1033,7 +1116,11 @@ function clearScratchpad() {
 function nextQuestion() {
   state.locked = false;
   if (state.qIndex >= state.total) {
-    finishQuiz();
+    if (state.mode === 'tower') {
+      finishTowerFloor();
+    } else {
+      finishQuiz();
+    }
     return;
   }
 
@@ -1097,6 +1184,7 @@ function nextQuestion() {
     initScratchpad();
     resetScratchCanvas();
   }
+  updateTowerLivesHUD();
 }
 
 function submitAnswer() {
@@ -1136,6 +1224,10 @@ function handleResult(ok) {
   } else {
     state.missed.push(state.current);
     if (state.current.type === 'choice') addToWeakList(state.profile, cid, cname, state.current);
+    if (state.mode === 'tower') {
+      state.towerFloorMisses++;
+      updateTowerLivesHUD();
+    }
   }
   showMark(ok);
   playResultSound(ok);
@@ -1146,6 +1238,15 @@ function handleResult(ok) {
     ? `<span style="color:var(--green); font-weight:700;">せいかい！</span>`
     : `正解は <b>${correctDisplay}</b> でした`;
   state.qIndex++;
+
+  if (state.mode === 'tower' && !ok) {
+    const rule = TOWER_DIFFICULTY[state.towerDifficulty];
+    if (state.towerFloorMisses > rule.maxMisses) {
+      setTimeout(expelFromTower, 2400);
+      return;
+    }
+  }
+
   setTimeout(nextQuestion, ok ? 700 : 2400);
 }
 
@@ -1165,6 +1266,7 @@ function showMark(ok) {
 
 function finishQuiz() {
   clearInterval(state.timerHandle);
+  recordPlayDay(state.profile);
   const rankIdx = state.correctCount;
   const isReview = state.mode === 'review';
   const isWeak = state.mode === 'weak';
