@@ -154,6 +154,9 @@ function showScreen(name) {
   if (name === 'leaderboard') renderLeaderboard();
   if (name === 'tower-subject') renderTowerSubjectList();
   if (name === 'tower-difficulty') renderTowerDifficultyScreen();
+  if (name === 'guild-register') renderGuildRegisterScreen();
+  if (name === 'guild') renderGuildScreen();
+  if (name === 'guild-ranking') renderGuildRankingScreen();
 }
 
 function goToRecords() {
@@ -538,6 +541,22 @@ const BADGE_DEFS = [
     check: ctx => ctx.towerAnyClearedSubjects >= 5 },
   { id: 'tower_master_single', name: '塔の極意', desc: 'いずれかの科目の塔を、全難易度（3種）で制覇した', icon: '💠',
     check: ctx => ctx.towerAllDifficultySubjects >= 1 },
+  { id: 'guild_license', name: 'ギルド登録', desc: 'ギルドに登録し冒険者ライセンスを受け取った', icon: '📜',
+    check: ctx => ctx.guildRegistered },
+  { id: 'guild_first_quest', name: '初めての依頼達成', desc: 'ギルドの依頼を初めて達成した', icon: '📋',
+    check: ctx => ctx.guildQuestsCompleted >= 1 },
+  { id: 'guild_quest_10', name: '頼れる冒険者', desc: 'ギルド依頼を累計10件達成した', icon: '🗡️',
+    check: ctx => ctx.guildQuestsCompleted >= 10 },
+  { id: 'guild_quest_50', name: 'ベテラン冒険者', desc: 'ギルド依頼を累計50件達成した', icon: '🛡️',
+    check: ctx => ctx.guildQuestsCompleted >= 50 },
+  { id: 'guild_points_100', name: 'ポイントハンター', desc: 'ギルドポイントを累計100pt獲得した', icon: '💰',
+    check: ctx => ctx.guildTotalPoints >= 100 },
+  { id: 'guild_points_500', name: 'ポイントマスター', desc: 'ギルドポイントを累計500pt獲得した', icon: '💎',
+    check: ctx => ctx.guildTotalPoints >= 500 },
+  // クラウド上の他プレイヤーのデータに依存するため、通常のctx方式では判定しない。
+  // ランキング画面を開いた瞬間に guild.js の awardBadgeDirect() から個別に付与される。
+  { id: 'guild_rank_1', name: 'ギルド週間ランキング1位', desc: '週が終了し、確定した最終結果でウィークリーのギルドポイントランキング1位だった', icon: '🥇',
+    check: () => false },
 ];
 
 
@@ -589,11 +608,17 @@ function buildBadgeContext(profile) {
 
   const hourOfCompletion = new Date().getHours();
 
+  const guildLicense = loadGuildLicense(profile);
+  const guildProgress = loadGuildProgress(profile);
+
   return {
     hasLastRecord, streakCount: streak.count, perfectCount, totalCorrect,
     subjectsPlayed: subjectsSeen.size, weakCleared, towerClearedDifficulties,
     totalPlayDays, towerAnyClearedSubjects, towerAllDifficultySubjects,
-    fullPentagonGrade, hourOfCompletion
+    fullPentagonGrade, hourOfCompletion,
+    guildRegistered: !!guildLicense,
+    guildQuestsCompleted: guildProgress.totalQuestsCompleted,
+    guildTotalPoints: guildProgress.totalPointsAllTime
   };
 }
 
@@ -1334,6 +1359,18 @@ function finishQuiz() {
   } else {
     reviewBtn.style.display = 'none';
   }
+
+  // ギルド依頼の達成判定（未登録なら何もしない）
+  const guildCompleted = evaluateGuildQuests(state.profile, {
+    kind: 'quiz',
+    subject: state.subject,
+    grade: state.grade,
+    mode: state.mode,
+    correctCount: state.correctCount,
+    total: state.total,
+    isPerfect
+  });
+  renderGuildQuestNotice(document.getElementById('guildQuestResultNotice'), guildCompleted);
 
   // 実績バッジの判定（累計データに基づくため、モードを問わず毎回チェックする）
   const newBadges = checkAndAwardBadges(state.profile);

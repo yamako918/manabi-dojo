@@ -130,3 +130,42 @@ async function loadNewCheers(profile) {
     return [];
   }
 }
+
+/* ---------- ギルド週間ポイントランキング ---------- */
+// ドキュメントID = `${プロフィール名}_${週キー}` として週ごとに別ドキュメントにすることで、
+// 「今週のランキング」を取得する際に複合インデックスなしの単純な where だけで済むようにしている。
+async function syncGuildWeeklyPoints(profile, rankId, weekKey, points) {
+  const ok = await initCloud();
+  if (!ok) return false;
+  try {
+    await cloudDb.collection('guildWeekly').doc(`${profile}_${weekKey}`).set({
+      name: profile,
+      weekKey,
+      points,
+      rank: rankId,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return true;
+  } catch (e) {
+    console.warn('ギルドポイントの送信に失敗しました:', e);
+    return false;
+  }
+}
+
+// 指定した週のギルドポイントランキングを取得する（上位20件、ポイント降順）
+async function loadGuildWeeklyRanking(weekKey) {
+  const ok = await initCloud();
+  if (!ok) return [];
+  try {
+    // where + orderBy の組み合わせは複合インデックスが必要になるため、
+    // あえて orderBy を使わず取得してからJS側でソートする（設定不要にするため）
+    const snap = await cloudDb.collection('guildWeekly').where('weekKey', '==', weekKey).limit(50).get();
+    return snap.docs
+      .map(d => d.data())
+      .sort((a, b) => (b.points || 0) - (a.points || 0))
+      .slice(0, 20);
+  } catch (e) {
+    console.warn('ギルドランキングの取得に失敗しました:', e);
+    return [];
+  }
+}

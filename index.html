@@ -438,11 +438,16 @@
       </div>
     </div>
 
-    <div id="towerEntryWrap" style="display:none;">
+    <div id="towerEntryWrap" style="display:none; flex-direction:column; gap:14px;">
       <div class="grade-card" style="--stripe:#7A2E8A;" onclick="playClick();showScreen('tower-subject');">
         <div class="kanji">塔</div>
         <h2>文明の塔</h2>
         <p>科目ごとの塔に挑戦し、最上階を目指そう</p>
+      </div>
+      <div class="grade-card" style="--stripe:#2E6B4A;" onclick="openGuild();">
+        <div class="kanji">組</div>
+        <h2>ギルド</h2>
+        <p>冒険者として登録し、日々の依頼でギルドポイントを稼ごう</p>
       </div>
     </div>
 
@@ -508,6 +513,7 @@
       <div class="eyebrow">TOWER OF CIVILIZATION</div>
       <h2 id="towerFloorClearTitle"></h2>
       <div class="meta" id="towerFloorClearMeta"></div>
+      <div class="new-badge-notice" id="towerFloorGuildNotice" style="display:none;"></div>
     </div>
     <div class="cert-actions">
       <button class="btn btn-primary" id="towerNextFloorBtn" onclick="advanceTowerFloor()"></button>
@@ -525,6 +531,7 @@
       </div>
       <div class="meta" id="towerResultMeta"></div>
       <div id="towerFloorBreakdown" class="record-section" style="margin-top:14px;"></div>
+      <div class="new-badge-notice" id="towerResultGuildNotice" style="display:none;"></div>
       <div class="new-badge-notice" id="towerNewBadgeNotice" style="display:none;"></div>
     </div>
     <div class="cert-actions">
@@ -586,6 +593,7 @@
         <div class="rankname" id="certRank">三級</div>
       </div>
       <div class="meta" id="certMeta"></div>
+      <div class="new-badge-notice" id="guildQuestResultNotice" style="display:none;"></div>
       <div class="new-badge-notice" id="newBadgeNotice" style="display:none;"></div>
     </div>
     <div class="cert-actions">
@@ -595,6 +603,35 @@
         <button class="btn btn-primary" onclick="retrySameCategory()">もう一度</button>
       </div>
     </div>
+  </div>
+
+  <!-- GUILD REGISTER: 冒険者ランク登録 -->
+  <div class="screen" id="screen-guild-register">
+    <button class="backbtn" onclick="backFromGuildRegister()">もどる</button>
+    <div class="grade-card" id="guildRegisterHeader" style="--stripe:#2E6B4A; cursor:default;"></div>
+    <div class="cat-list" id="guildRankList"></div>
+  </div>
+
+  <!-- GUILD: ダッシュボード（ライセンス・今日の依頼・週間ポイント） -->
+  <div class="screen" id="screen-guild">
+    <button class="backbtn" onclick="playClick();showScreen('subjects');">もどる</button>
+    <div class="grade-card" id="guildLicenseCard" style="cursor:default;"></div>
+    <button class="switch-link" style="align-self:flex-start; padding-left:2px;" onclick="openGuildRankChange()">ランクを変更する</button>
+    <div class="last-record" id="guildWeekPoints"></div>
+    <button class="btn btn-outline" onclick="playClick();showScreen('guild-ranking');">🏆 週間ランキングを見る</button>
+    <div class="new-badge-notice" id="guildQuestNotice" style="display:none;"></div>
+    <div class="record-subject-heading" style="--stripe:#2E6B4A;">今日のギルド依頼</div>
+    <div class="cat-list" id="guildQuestList"></div>
+    <div class="footnote">依頼は毎日リセットされ、ランダムに3つ表示されます</div>
+  </div>
+
+  <!-- GUILD RANKING: 週間ギルドポイントランキング -->
+  <div class="screen" id="screen-guild-ranking">
+    <button class="backbtn" onclick="playClick();showScreen('guild');">もどる</button>
+    <div class="footnote" id="guildRankingPeriod"></div>
+    <div class="leaderboard-notice" id="guildRankingNotice" style="display:none;"></div>
+    <div class="new-badge-notice" id="guildRankingBadgeNotice" style="display:none;"></div>
+    <div class="cat-list" id="guildRankingList"></div>
   </div>
 </div>
 
@@ -607,6 +644,7 @@
 <script src="js/expansion.js"></script>
 <script src="js/generator.js"></script>
 <script src="js/tower.js"></script>
+<script src="js/guild.js"></script>
 <script src="js/firebase-config.js"></script>
 <script src="js/cloud.js"></script>
 <script src="js/ui.js"></script>

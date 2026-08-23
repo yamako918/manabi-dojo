@@ -166,6 +166,7 @@ function startTowerRun(subject, difficultyId) {
   state.towerSubject = subject;
   state.towerDifficulty = difficultyId;
   state.towerFloorResults = [];
+  state.towerLastGuildCompleted = [];
   state.missed = [];
   state.subject = subject;
   startTowerFloor(1);
@@ -221,6 +222,7 @@ function finishTowerFloor() {
     total: state.total,
     misses: state.towerFloorMisses,
   });
+  state.towerLastGuildCompleted = evaluateGuildQuests(state.profile, { kind: 'tower_floor' });
   if (state.towerFloor >= TOWER_TOTAL_FLOORS) {
     completeTowerRun(true);
   } else {
@@ -237,6 +239,8 @@ function expelFromTower() {
     total: state.total,
     misses: state.towerFloorMisses,
   });
+  // 追放された階は突破していないので、直前の階で表示済みのギルド通知を持ち越さない
+  state.towerLastGuildCompleted = [];
   completeTowerRun(false);
 }
 
@@ -245,6 +249,7 @@ function showTowerFloorClearScreen() {
   const r = state.towerFloorResults[state.towerFloorResults.length - 1];
   document.getElementById('towerFloorClearMeta').innerHTML =
     `${SUBJECT_LABEL[state.towerSubject]}の塔　${r.grade}<br>${r.correct} / ${r.total} 問正解（ミス${r.misses}回）`;
+  renderGuildQuestNotice(document.getElementById('towerFloorGuildNotice'), state.towerLastGuildCompleted);
   const nextFloor = state.towerFloor + 1;
   document.getElementById('towerNextFloorBtn').textContent =
     nextFloor <= TOWER_TOTAL_FLOORS ? `${nextFloor}階へ進む` : '塔を制覇する';
@@ -309,6 +314,8 @@ function renderTowerResultScreen(cleared, newBadges) {
   document.getElementById('towerResultMeta').innerHTML =
     `到達：${state.towerFloorResults.length}階 / 全${TOWER_TOTAL_FLOORS}階<br>累計 ${totalCorrect} / ${totalQuestions} 問正解`;
 
+  renderGuildQuestNotice(document.getElementById('towerResultGuildNotice'), state.towerLastGuildCompleted);
+
   const breakdown = document.getElementById('towerFloorBreakdown');
   breakdown.innerHTML = state.towerFloorResults
     .map(
@@ -368,7 +375,7 @@ function toggleFieldOutside() {
     btn.textContent = '🚪 道場からでる';
   } else {
     subjectsWrap.style.display = 'none';
-    towerEntryWrap.style.display = 'block';
+    towerEntryWrap.style.display = 'flex';
     btn.textContent = '🏠 道場へもどる';
   }
 }
