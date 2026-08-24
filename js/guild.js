@@ -318,6 +318,72 @@ function completeGuildRegistration(rankId) {
   showScreen('guild');
 }
 
+/* ---------- ギルドの受付（優しい口調） ---------- */
+function guildReceptionistSVG(mood) {
+  // 丸みのある耳長キャラクター（ギルドの色＝緑を基調にした簡素なSVG）
+  const eyes = mood === 'happy'
+    ? `<path d="M20 30 Q24 25.5 28 30" stroke="#1F3A2A" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+       <path d="M30 30 Q34 25.5 38 30" stroke="#1F3A2A" stroke-width="2.4" fill="none" stroke-linecap="round"/>`
+    : `<circle cx="24" cy="29" r="3.4" fill="#1F3A2A"/><circle cx="34" cy="29" r="3.4" fill="#1F3A2A"/>
+       <circle cx="25" cy="27.8" r="1" fill="#fff"/><circle cx="35" cy="27.8" r="1" fill="#fff"/>`;
+  return `
+    <svg viewBox="0 0 56 56" width="100%" height="100%">
+      <ellipse cx="18" cy="12" rx="5.5" ry="12" fill="#8FC7A1"/>
+      <ellipse cx="38" cy="12" rx="5.5" ry="12" fill="#8FC7A1"/>
+      <ellipse cx="18" cy="13" rx="3" ry="8" fill="#F4C9CC"/>
+      <ellipse cx="38" cy="13" rx="3" ry="8" fill="#F4C9CC"/>
+      <ellipse cx="28" cy="32" rx="21" ry="19" fill="#8FC7A1"/>
+      <circle cx="24" cy="29" r="8" fill="#fff"/>
+      <circle cx="34" cy="29" r="8" fill="#fff"/>
+      ${eyes}
+      <ellipse cx="18" cy="36" rx="3" ry="1.8" fill="#F4C9CC" opacity="0.7"/>
+      <ellipse cx="38" cy="36" rx="3" ry="1.8" fill="#F4C9CC" opacity="0.7"/>
+      <path d="M28 36 Q30 39 28 41 Q26 39 28 36 Z" fill="#2E6B4A"/>
+    </svg>
+  `;
+}
+
+function getGuildReceptionistMessage(profile) {
+  if (!isGuildRegistered(profile)) {
+    return {
+      mood: 'neutral',
+      text: 'ようこそ、まなび道場ギルドへ。まだご登録がお済みでないようですね。よろしければ、冒険者ランクを選んで登録なさってくださいね。',
+    };
+  }
+  const quests = loadGuildDailyQuests(profile).quests;
+  const doneCount = quests.filter(q => q.completed).length;
+  const wk = loadGuildWeekPoints(profile);
+  const progress = loadGuildProgress(profile);
+
+  if (quests.length > 0 && doneCount === quests.length) {
+    return {
+      mood: 'happy',
+      text: `本日の依頼、すべて達成なさいましたね。お疲れさまでした。今週はもう${wk.points}ポイント貯まっていますよ。`,
+    };
+  }
+  if (doneCount > 0) {
+    return {
+      mood: 'happy',
+      text: `${doneCount}件の依頼を達成なさいましたね。残りもその調子で、無理のない範囲でどうぞ。`,
+    };
+  }
+  const messages = [
+    '今日の依頼、まだ残っていますよ。一つずつ、ゆっくりで大丈夫です。',
+    `これまでに累計${progress.totalQuestsCompleted}件の依頼を達成なさっていますね。素敵な冒険者さんです。`,
+    '週間のポイントランキングもご用意していますので、よろしければ覗いてみてくださいね。',
+  ];
+  return { mood: 'neutral', text: pick(messages) };
+}
+
+function renderGuildReceptionist() {
+  const avatar = document.getElementById('guildReceptionistAvatar');
+  const bubble = document.getElementById('guildReceptionistMessage');
+  if (!avatar || !bubble) return;
+  const { mood, text } = getGuildReceptionistMessage(state.profile);
+  avatar.innerHTML = guildReceptionistSVG(mood);
+  bubble.textContent = text;
+}
+
 /* ---------- 画面：ギルドのダッシュボード（ライセンス・今日の依頼・週間ポイント） ---------- */
 function renderGuildScreen() {
   const license = loadGuildLicense(state.profile);
@@ -325,6 +391,7 @@ function renderGuildScreen() {
     showScreen('guild-register');
     return;
   }
+  renderGuildReceptionist();
   const rank = GUILD_RANKS[license.rankId];
   const progress = loadGuildProgress(state.profile);
 

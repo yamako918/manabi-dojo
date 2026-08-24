@@ -72,13 +72,70 @@ function updateArenaLocalBest(profile, timeLimitKey, correctCount, subject, grad
   return true;
 }
 
-/* ---------- 画面：闘技場への入口・科目選択 ---------- */
 function openArena() {
   playClick();
   showScreen('arena-subject');
 }
 
+/* ---------- 闘技場の受付（ぶっきらぼう口調） ---------- */
+function arenaReceptionistSVG(mood) {
+  // 角刈り・鋭い目つきのキャラクター（闘技場の色＝赤を基調にした簡素なSVG）
+  const eyes = mood === 'happy'
+    ? `<path d="M20 30 Q24 27 28 30" stroke="#3A1414" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+       <path d="M30 30 Q34 27 38 30" stroke="#3A1414" stroke-width="2.4" fill="none" stroke-linecap="round"/>`
+    : `<path d="M19 27 L27 29" stroke="#3A1414" stroke-width="2.4" stroke-linecap="round"/>
+       <path d="M37 27 L29 29" stroke="#3A1414" stroke-width="2.4" stroke-linecap="round"/>
+       <circle cx="23" cy="31" r="2.6" fill="#3A1414"/><circle cx="33" cy="31" r="2.6" fill="#3A1414"/>`;
+  return `
+    <svg viewBox="0 0 56 56" width="100%" height="100%">
+      <path d="M10 14 L46 14 L42 6 L14 6 Z" fill="#8A2A2A"/>
+      <ellipse cx="28" cy="32" rx="20" ry="19" fill="#E8B98F"/>
+      <path d="M8 24 Q28 8 48 24 L48 20 Q28 4 8 20 Z" fill="#3A1414"/>
+      <path d="M16 38 Q28 44 40 38" stroke="#3A1414" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+      ${eyes}
+    </svg>
+  `;
+}
+
+function getArenaReceptionistMessage(profile) {
+  const bests = loadArenaLocalBest(profile);
+  const has1 = bests['1min'];
+  const has3 = bests['3min'];
+
+  if (!has1 && !has3) {
+    const messages = [
+      'まだ闘技場に出たことないのか。冷やかしじゃないなら、さっさと挑んでみろ。',
+      '腕試しの場だぞ、ここは。科目と学年、時間を選んだらすぐ始まる。構えなくていい。',
+    ];
+    return { mood: 'neutral', text: pick(messages) };
+  }
+
+  const parts = [];
+  if (has1) parts.push(`1分間は${has1.correctCount}問`);
+  if (has3) parts.push(`3分間は${has3.correctCount}問`);
+  const record = parts.join('、');
+
+  const messages = [
+    `${record}か。まあ、悪くない数字だ。`,
+    `${record}。上等だ。もっと上を目指すならランキングも見ておけ。`,
+    'ランキング、まだ見てないのか？行ってこい。',
+    '記録更新したけりゃ、迷ってる暇はないぞ。',
+  ];
+  return { mood: 'neutral', text: pick(messages) };
+}
+
+function renderArenaReceptionist() {
+  const avatar = document.getElementById('arenaReceptionistAvatar');
+  const bubble = document.getElementById('arenaReceptionistMessage');
+  if (!avatar || !bubble) return;
+  const { mood, text } = getArenaReceptionistMessage(state.profile);
+  avatar.innerHTML = arenaReceptionistSVG(mood);
+  bubble.textContent = text;
+}
+
+/* ---------- 画面：闘技場への入口・科目選択 ---------- */
 function renderArenaSubjectScreen() {
+  renderArenaReceptionist();
   const wrap = document.getElementById('arenaSubjectList');
   wrap.innerHTML = '';
   SUBJECT_ORDER.forEach(subject => {

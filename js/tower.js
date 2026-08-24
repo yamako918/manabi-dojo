@@ -101,7 +101,89 @@ function buildTowerFloorQuestions(subject, floorIdx) {
 }
 
 /* ---------- 画面：塔（科目）選択 ---------- */
+/* ---------- 文明の塔の門番（かしこまった口調） ---------- */
+// 塔の入口で、直近1週間に塔を踏破した人がいたかを教えてくれる。
+// 家族内の複数プロフィール（この端末に登録されているもの）をまとめて確認する。
+const TOWER_GATEKEEPER_RECENT_DAYS = 7;
+
+function towerGatekeeperSVG(mood) {
+  // フード付きローブの人物のシルエット（塔の色＝紫を基調にした簡素なSVG）
+  const eyes = mood === 'happy'
+    ? `<path d="M20 30 Q24 26 28 30" stroke="#F4EAFB" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+       <path d="M30 30 Q34 26 38 30" stroke="#F4EAFB" stroke-width="2.2" fill="none" stroke-linecap="round"/>`
+    : `<line x1="21" y1="29" x2="27" y2="29" stroke="#F4EAFB" stroke-width="2.2" stroke-linecap="round"/>
+       <line x1="31" y1="29" x2="37" y2="29" stroke="#F4EAFB" stroke-width="2.2" stroke-linecap="round"/>`;
+  return `
+    <svg viewBox="0 0 56 56" width="100%" height="100%">
+      <path d="M28 4 C14 4 8 20 8 34 L8 52 L48 52 L48 34 C48 20 42 4 28 4 Z" fill="#5B2472"/>
+      <path d="M28 10 C18 10 13 22 13 34 L13 46 L43 46 L43 34 C43 22 38 10 28 10 Z" fill="#7A2E8A"/>
+      <ellipse cx="28" cy="30" rx="13" ry="12" fill="#3C1C4D"/>
+      ${eyes}
+      <rect x="46" y="18" width="4" height="30" rx="2" fill="#C98A2C"/>
+      <circle cx="48" cy="16" r="5" fill="#F2CB6A"/>
+    </svg>
+  `;
+}
+
+// この端末に登録されている全プロフィールを対象に、直近1週間で
+// いずれかの科目の塔を「踏破」（cleared:true）した人を集める。
+function findTowerConquerorsThisWeek() {
+  const cutoff = Date.now() - TOWER_GATEKEEPER_RECENT_DAYS * 24 * 60 * 60 * 1000;
+  const conquerors = new Set();
+  getProfiles().forEach(profile => {
+    SUBJECT_ORDER.forEach(subject => {
+      let history = [];
+      try {
+        history = JSON.parse(localStorage.getItem(`kd-tower-history-${profile}-${subject}`)) || [];
+      } catch (e) {
+        history = [];
+      }
+      const hasRecentClear = history.some(h => h.cleared && typeof h.timestamp === 'number' && h.timestamp >= cutoff);
+      if (hasRecentClear) conquerors.add(profile);
+    });
+  });
+  return Array.from(conquerors);
+}
+
+function getTowerGatekeeperMessage(profile) {
+  const conquerors = findTowerConquerorsThisWeek();
+  if (conquerors.length === 0) {
+    return {
+      mood: 'neutral',
+      text: 'この一週間、塔を踏破された方はまだいらっしゃらないようです。最初の踏破者となる栄誉は、あなたに委ねられているのかもしれません。',
+    };
+  }
+  const others = conquerors.filter(name => name !== profile);
+  if (others.length === 0) {
+    return {
+      mood: 'happy',
+      text: 'この一週間、塔を踏破されたのはあなただけでございます。誠に見事な成果と申し上げます。',
+    };
+  }
+  if (conquerors.includes(profile)) {
+    return {
+      mood: 'happy',
+      text: `この一週間、あなたと${others.join('様・')}様が塔を踏破されました。両者とも見事な健闘でございます。`,
+    };
+  }
+  return {
+    mood: 'neutral',
+    text: `この一週間、${others.join('様・')}様が塔を踏破されました。あなたも挑まれてはいかがでしょうか。`,
+  };
+}
+
+function renderTowerGatekeeper() {
+  const avatar = document.getElementById('towerGatekeeperAvatar');
+  const bubble = document.getElementById('towerGatekeeperMessage');
+  if (!avatar || !bubble) return;
+  const { mood, text } = getTowerGatekeeperMessage(state.profile);
+  avatar.innerHTML = towerGatekeeperSVG(mood);
+  bubble.textContent = text;
+}
+
+/* ---------- 画面：塔（科目）選択 ---------- */
 function renderTowerSubjectList() {
+  renderTowerGatekeeper();
   const wrap = document.getElementById('towerSubjectList');
   wrap.innerHTML = '';
   SUBJECT_ORDER.forEach(subject => {
@@ -289,6 +371,7 @@ function completeTowerRun(cleared) {
   const today = new Date();
   history.unshift({
     date: `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`,
+    timestamp: today.getTime(), // 「直近1週間」の判定に使う生の時刻（門番のコメント用）
     difficulty,
     cleared,
     reachedFloor,

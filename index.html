@@ -502,6 +502,10 @@
   <!-- TOWER SUBJECT: 塔（科目）選択 -->
   <div class="screen" id="screen-tower-subject">
     <button class="backbtn" onclick="backToFieldOutside()">もどる</button>
+    <div class="mascot-row" id="towerGatekeeperRow">
+      <div class="mascot-avatar" id="towerGatekeeperAvatar"></div>
+      <div class="mascot-bubble" id="towerGatekeeperMessage"></div>
+    </div>
     <div id="towerSubjectList" style="display:flex; flex-direction:column; gap:14px;"></div>
   </div>
 
@@ -620,6 +624,10 @@
   <!-- GUILD: ダッシュボード（ライセンス・今日の依頼・週間ポイント） -->
   <div class="screen" id="screen-guild">
     <button class="backbtn" onclick="backToFieldOutside()">もどる</button>
+    <div class="mascot-row" id="guildReceptionistRow">
+      <div class="mascot-avatar" id="guildReceptionistAvatar"></div>
+      <div class="mascot-bubble" id="guildReceptionistMessage"></div>
+    </div>
     <div class="grade-card" id="guildLicenseCard" style="cursor:default;"></div>
     <button class="switch-link" style="align-self:flex-start; padding-left:2px;" onclick="openGuildRankChange()">ランクを変更する</button>
     <div class="last-record" id="guildWeekPoints"></div>
@@ -642,6 +650,10 @@
   <!-- ARENA SUBJECT: 闘技場・科目選択 -->
   <div class="screen" id="screen-arena-subject">
     <button class="backbtn" onclick="backToFieldOutside()">もどる</button>
+    <div class="mascot-row" id="arenaReceptionistRow">
+      <div class="mascot-avatar" id="arenaReceptionistAvatar"></div>
+      <div class="mascot-bubble" id="arenaReceptionistMessage"></div>
+    </div>
     <button class="btn btn-outline" onclick="playClick();showScreen('arena-ranking');">🏆 闘技場のランキング</button>
     <div id="arenaSubjectList" style="display:flex; flex-direction:column; gap:14px;"></div>
   </div>
