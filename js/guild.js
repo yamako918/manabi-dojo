@@ -474,7 +474,7 @@ async function renderGuildRankingScreen() {
       row.className = 'cat-card';
       const rankLabel = GUILD_RANKS[entry.rank] ? GUILD_RANKS[entry.rank].label : '';
       row.innerHTML = `
-        <div class="cat-num">${idx + 1}</div>
+        <div class="cat-num">${rankMedalHTML(idx + 1)}</div>
         <div class="cat-body">
           <h3>${entry.name}${isSelf ? '（自分）' : ''}</h3>
           <span>${entry.points || 0} pt・${rankLabel}</span>

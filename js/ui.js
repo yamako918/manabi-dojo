@@ -156,6 +156,7 @@ function showScreen(name) {
   if (name === 'leaderboard') renderLeaderboard();
   if (name === 'tower-subject') renderTowerSubjectList();
   if (name === 'tower-difficulty') renderTowerDifficultyScreen();
+  if (name === 'tower-monument') renderTowerMonumentScreen();
   if (name === 'guild-register') renderGuildRegisterScreen();
   if (name === 'guild') renderGuildScreen();
   if (name === 'guild-ranking') renderGuildRankingScreen();

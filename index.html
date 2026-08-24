@@ -506,6 +506,7 @@
       <div class="mascot-avatar" id="towerGatekeeperAvatar"></div>
       <div class="mascot-bubble" id="towerGatekeeperMessage"></div>
     </div>
+    <button class="btn btn-outline" onclick="playClick();showScreen('tower-monument');">🪨 踏破の石碑を見る</button>
     <div id="towerSubjectList" style="display:flex; flex-direction:column; gap:14px;"></div>
   </div>
 
@@ -514,6 +515,14 @@
     <button class="backbtn" onclick="playClick();showScreen('tower-subject');">もどる</button>
     <div class="grade-card" id="towerDifficultyHeader" style="cursor:default;"></div>
     <div class="cat-list" id="towerDifficultyList"></div>
+  </div>
+
+  <!-- TOWER MONUMENT: 踏破の石碑（完璧主義／魔法のお守りでの踏破記録・日付昇順） -->
+  <div class="screen" id="screen-tower-monument">
+    <button class="backbtn" onclick="playClick();showScreen('tower-subject');">もどる</button>
+    <div class="footnote">完璧主義・魔法のお守りでの踏破のみを、日付の古い順に刻んでいます</div>
+    <div class="leaderboard-notice" id="towerMonumentNotice" style="display:none;"></div>
+    <div class="cat-list" id="towerMonumentList"></div>
   </div>
 
   <!-- TOWER FLOOR CLEAR: 階クリア中間画面 -->
@@ -654,7 +663,7 @@
       <div class="mascot-avatar" id="arenaReceptionistAvatar"></div>
       <div class="mascot-bubble" id="arenaReceptionistMessage"></div>
     </div>
-    <button class="btn btn-outline" onclick="playClick();showScreen('arena-ranking');">🏆 闘技場のランキング</button>
+    <button class="btn btn-outline" onclick="playClick();showScreen('arena-ranking');">🏆 闘技場ランキングを見る</button>
     <div id="arenaSubjectList" style="display:flex; flex-direction:column; gap:14px;"></div>
   </div>
 

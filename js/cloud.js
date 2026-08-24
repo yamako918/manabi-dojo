@@ -209,3 +209,67 @@ async function loadArenaRanking(timeLimitKey) {
   }
 }
 
+/* ---------- 文明の塔の踏破記録 ---------- */
+// 塔を踏破（cleared:true）するたびに1件追加する（改ざん防止のため追加のみ許可）。
+// 同じ人が複数回踏破することもあるため、ドキュメントIDは自動採番でよい
+// （「直近1週間に踏破した人」を調べる際はJS側で名前を重複排除する）。
+async function syncTowerConquest(profile, subject, difficulty, reachedFloor) {
+  const ok = await initCloud();
+  if (!ok) return false;
+  try {
+    await cloudDb.collection('towerConquests').add({
+      name: profile,
+      subject,
+      difficulty,
+      reachedFloor,
+      achievedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return true;
+  } catch (e) {
+    console.warn('塔踏破記録の送信に失敗しました:', e);
+    return false;
+  }
+}
+
+// 指定した時刻（ミリ秒）以降に塔を踏破した人のプロフィール名一覧を返す
+// （別端末のプロフィールも含む、重複あり得るので呼び出し側でSet等に入れて重複排除する）。
+async function loadRecentTowerConquerors(sinceMs) {
+  const ok = await initCloud();
+  if (!ok) return [];
+  try {
+    // achievedAt単体でのorderByは単一フィールドなので複合インデックス不要。
+    // 直近50件を取得してからJS側で時刻フィルタする。
+    const snap = await cloudDb.collection('towerConquests').orderBy('achievedAt', 'desc').limit(50).get();
+    return snap.docs
+      .map(d => d.data())
+      .filter(c => c.achievedAt && typeof c.achievedAt.toMillis === 'function' && c.achievedAt.toMillis() >= sinceMs)
+      .map(c => c.name);
+  } catch (e) {
+    console.warn('塔踏破記録の取得に失敗しました:', e);
+    return [];
+  }
+}
+
+// 「踏破の石碑」用：完璧主義（solo）・魔法のお守り（amulet）での踏破記録のみを、
+// 日付の昇順（古い記録が先）で全件取得する。ランキングとは異なり、期間で
+// リセットされない永続的な記録として扱う。
+async function loadTowerMonument() {
+  const ok = await initCloud();
+  if (!ok) return [];
+  try {
+    // 単一フィールドへの in 演算子は複合インデックス不要。
+    const snap = await cloudDb
+      .collection('towerConquests')
+      .where('difficulty', 'in', ['solo', 'amulet'])
+      .limit(300)
+      .get();
+    return snap.docs
+      .map(d => d.data())
+      .filter(c => c.achievedAt && typeof c.achievedAt.toMillis === 'function')
+      .sort((a, b) => a.achievedAt.toMillis() - b.achievedAt.toMillis());
+  } catch (e) {
+    console.warn('踏破の石碑の取得に失敗しました:', e);
+    return [];
+  }
+}
+

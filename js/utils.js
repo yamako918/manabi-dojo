@@ -124,3 +124,11 @@ function cloneShuffled(item) {
     correct: idxs.indexOf(item.correct)
   };
 }
+
+// ランキング表示用：1〜3位は金・銀・銅メダルのアイコンに、4位以降は順位の数字にする
+function rankMedalHTML(rank) {
+  if (rank === 1) return '🥇';
+  if (rank === 2) return '🥈';
+  if (rank === 3) return '🥉';
+  return String(rank);
+}

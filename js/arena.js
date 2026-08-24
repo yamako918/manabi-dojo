@@ -390,7 +390,7 @@ async function renderArenaRankingScreen() {
     const row = document.createElement('div');
     row.className = 'cat-card';
     row.innerHTML = `
-      <div class="cat-num">${idx + 1}</div>
+      <div class="cat-num">${rankMedalHTML(idx + 1)}</div>
       <div class="cat-body">
         <h3>${entry.name}${isSelf ? '（自分）' : ''}</h3>
         <span>${entry.correctCount || 0}問正解・${SUBJECT_LABEL[entry.subject] || ''}${entry.grade ? '　' + GRADE_LABEL[entry.grade] : ''}</span>

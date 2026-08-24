@@ -127,9 +127,11 @@ function towerGatekeeperSVG(mood) {
 
 // この端末に登録されている全プロフィールを対象に、直近1週間で
 // いずれかの科目の塔を「踏破」（cleared:true）した人を集める。
-function findTowerConquerorsThisWeek() {
+async function findTowerConquerorsThisWeek() {
   const cutoff = Date.now() - TOWER_GATEKEEPER_RECENT_DAYS * 24 * 60 * 60 * 1000;
   const conquerors = new Set();
+
+  // この端末に登録されている全プロフィール（ローカル）
   getProfiles().forEach(profile => {
     SUBJECT_ORDER.forEach(subject => {
       let history = [];
@@ -142,11 +144,18 @@ function findTowerConquerorsThisWeek() {
       if (hasRecentClear) conquerors.add(profile);
     });
   });
+
+  // クラウド連携が設定されていれば、別端末のプロフィールも横断して確認する
+  if (isCloudConfigured()) {
+    const cloudNames = await loadRecentTowerConquerors(cutoff);
+    cloudNames.forEach(name => conquerors.add(name));
+  }
+
   return Array.from(conquerors);
 }
 
-function getTowerGatekeeperMessage(profile) {
-  const conquerors = findTowerConquerorsThisWeek();
+async function getTowerGatekeeperMessage(profile) {
+  const conquerors = await findTowerConquerorsThisWeek();
   if (conquerors.length === 0) {
     return {
       mood: 'neutral',
@@ -172,18 +181,59 @@ function getTowerGatekeeperMessage(profile) {
   };
 }
 
-function renderTowerGatekeeper() {
+async function renderTowerGatekeeper() {
   const avatar = document.getElementById('towerGatekeeperAvatar');
   const bubble = document.getElementById('towerGatekeeperMessage');
   if (!avatar || !bubble) return;
-  const { mood, text } = getTowerGatekeeperMessage(state.profile);
+  // クラウドへの問い合わせを待つ間は、暫定の表情・文言を出しておく
+  avatar.innerHTML = towerGatekeeperSVG('neutral');
+  bubble.textContent = 'この一週間の踏破者を確認しています…';
+  const { mood, text } = await getTowerGatekeeperMessage(state.profile);
   avatar.innerHTML = towerGatekeeperSVG(mood);
   bubble.textContent = text;
 }
 
+/* ---------- 画面：踏破の石碑 ----------
+   ランキングとは異なり、期間でリセットされない永続的な記録。
+   「完璧主義」「魔法のお守り」で踏破した人だけを、日付の昇順（古い順）で並べる。 */
+async function renderTowerMonumentScreen() {
+  const notice = document.getElementById('towerMonumentNotice');
+  const wrap = document.getElementById('towerMonumentList');
+  if (!isCloudConfigured()) {
+    notice.style.display = 'block';
+    notice.textContent = 'クラウド連携がまだ設定されていないため、踏破の石碑は表示できません。';
+    wrap.innerHTML = '';
+    return;
+  }
+  notice.style.display = 'none';
+  wrap.innerHTML = `<div class="footnote" style="padding:14px 0;">読み込み中…</div>`;
+
+  const list = await loadTowerMonument();
+  wrap.innerHTML = '';
+  if (list.length === 0) {
+    wrap.innerHTML = `<div class="footnote" style="padding:14px 0;">まだ「完璧主義」または「魔法のお守り」での踏破記録がありません。最初の1人になれるかもしれません。</div>`;
+    return;
+  }
+  list.forEach((entry, idx) => {
+    const d = entry.achievedAt.toDate();
+    const dateStr = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+    const diffLabel = TOWER_DIFFICULTY[entry.difficulty] ? TOWER_DIFFICULTY[entry.difficulty].label : entry.difficulty;
+    const row = document.createElement('div');
+    row.className = 'cat-card';
+    row.innerHTML = `
+      <div class="cat-num">${idx + 1}</div>
+      <div class="cat-body">
+        <h3>${entry.name}</h3>
+        <span>${SUBJECT_LABEL[entry.subject] || ''}・${diffLabel}・${dateStr}</span>
+      </div>
+    `;
+    wrap.appendChild(row);
+  });
+}
+
 /* ---------- 画面：塔（科目）選択 ---------- */
 function renderTowerSubjectList() {
-  renderTowerGatekeeper();
+  renderTowerGatekeeper(); // 非同期だが待たずに描画を進める（完了次第セリフが差し替わる）
   const wrap = document.getElementById('towerSubjectList');
   wrap.innerHTML = '';
   SUBJECT_ORDER.forEach(subject => {
@@ -378,6 +428,12 @@ function completeTowerRun(cleared) {
     floorResults: state.towerFloorResults.slice(),
   });
   localStorage.setItem(historyKey, JSON.stringify(history.slice(0, 20)));
+
+  // 踏破に成功した場合、クラウド連携が設定されていれば別端末からも
+  // 「直近1週間の踏破者」として見えるよう記録を送信する
+  if (cleared && isCloudConfigured()) {
+    syncTowerConquest(profile, subject, difficulty, reachedFloor);
+  }
 
   // バッジ判定（既存のBADGE_DEFS + buildBadgeContextの仕組みに乗せる）
   const newBadges = checkAndAwardBadges(profile);
