@@ -1330,8 +1330,10 @@ function finishQuiz() {
   clearInterval(state.timerHandle);
   recordPlayDay(state.profile);
   const rankIdx = state.correctCount;
-  const isReview = state.mode === 'review';
-  const isWeak = state.mode === 'weak';
+  // 「まちがえた問題を復習する」（mode:'review'）も、ホーム画面の
+  // 「にがて克服する」（mode:'weak'）と同じ扱いにする
+  // （認定証の表示・ギルド依頼「にがて克服モードに1回挑戦する」の達成判定を統一するため）。
+  const isWeak = state.mode === 'weak' || state.mode === 'review';
   const isScored = state.mode === 'normal'; // 復習・にがて克服は段位/累計統計の対象外
   const isPerfect = state.total > 0 && state.correctCount === state.total;
 
@@ -1375,19 +1377,17 @@ function finishQuiz() {
       category: state.subject ? `${SUBJECT_LABEL[state.subject]}「${state.catName}」` : state.catName,
       correct: state.correctCount,
       total: state.total,
-      review: isReview,
       weak: isWeak
     })
   );
 
-  const modeLabel = isWeak ? 'にがて克服' : isReview ? '復習' : '';
   document.getElementById('certEyebrow').textContent = isScored ? 'CERTIFICATE OF ACHIEVEMENT' : (isWeak ? 'WEAK POINT TRAINING' : 'REVIEW COMPLETE');
-  document.getElementById('certTitle').textContent = isWeak ? 'にがて克服けっか' : isReview ? '復習けっか' : '認定証';
+  document.getElementById('certTitle').textContent = isWeak ? 'にがて克服けっか' : '認定証';
   document.getElementById('certName').textContent = state.profile;
   document.getElementById('certRank').textContent = isScored ? RANKS[rankIdx] : `${state.correctCount}/${state.total} 正解`;
   document.getElementById('certMeta').innerHTML = isScored
     ? `${SUBJECT_LABEL[state.subject]}　${GRADE_LABEL[state.grade]}「${state.catName}」<br>${state.correctCount} / ${state.total} 問正解<br>${dateStr}`
-    : `${state.catName}${modeLabel ? `（${modeLabel}）` : ''}<br>${state.correctCount} / ${state.total} 問正解<br>${dateStr}`;
+    : `${state.catName}${isWeak ? '（にがて克服）' : ''}<br>${state.correctCount} / ${state.total} 問正解<br>${dateStr}`;
 
   const reviewBtn = document.getElementById('reviewBtn');
   if (state.missed.length > 0) {

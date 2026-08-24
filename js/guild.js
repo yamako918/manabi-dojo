@@ -191,7 +191,9 @@ function questMatchesEvent(q, ev) {
     return ev.kind === 'quiz' && ev.mode === 'normal' && ev.correctCount >= q.threshold;
   }
   if (q.type === 'weak_review') {
-    return ev.kind === 'quiz' && ev.mode === 'weak';
+    // ホーム画面の「にがて克服する」（mode:'weak'）に加え、クイズ直後の
+    // 「まちがえた問題を復習する」（mode:'review'）もにがて克服として扱う
+    return ev.kind === 'quiz' && (ev.mode === 'weak' || ev.mode === 'review');
   }
   if (q.type === 'tower_floor') {
     return ev.kind === 'tower_floor';

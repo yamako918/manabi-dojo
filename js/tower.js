@@ -434,9 +434,9 @@ function renderTowerResultScreen(cleared, newBadges) {
   }
 }
 
-/* ---------- ホーム画面：「道場からでる」トグル ---------- */
-// 道場の外（文明の塔・ギルドの一覧）を表示中かどうかを記憶しておく。
-// 塔・ギルドの各画面から「もどる」で戻ってきたときも、道場（算数〜英語）
+/* ---------- ホーム画面：「冒険へ旅立つ」トグル ---------- */
+// 道場の外（文明の塔・ギルド・闘技場の一覧）を表示中かどうかを記憶しておく。
+// 各画面から「もどる」で戻ってきたときも、道場（算数〜英語）
 // ではなくこちらの一覧が再表示されるようにするためのフラグ。
 let fieldOutsideActive = false;
 
@@ -455,7 +455,7 @@ function updateTowerToggleVisibility() {
     fieldOutsideActive = false; // 未解禁時に誤ってフラグが残らないようにする
     subjectsWrap.style.display = 'flex';
     towerEntryWrap.style.display = 'none';
-    btn.textContent = '🚪 道場からでる';
+    btn.textContent = '🚪 冒険へ旅立つ';
   }
 }
 
