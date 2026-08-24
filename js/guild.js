@@ -69,7 +69,8 @@ function registerGuildLicense(profile, rankId) {
   const existing = loadGuildLicense(profile);
   const registeredAt = existing ? existing.registeredAt : Date.now();
   saveGuildLicense(profile, { rankId, registeredAt, rankChangedAt: Date.now() });
-  checkAndAwardBadges(profile); // 「ギルド登録」バッジ判定
+  const newBadges = checkAndAwardBadges(profile); // 「ギルド登録」バッジ判定
+  if (newBadges.length > 0) playBadgeGet();
 }
 
 /* ---------- 累計進捗（依頼達成数・累計ポイント） ---------- */
@@ -228,7 +229,9 @@ function evaluateGuildQuests(profile, eventInfo) {
       syncGuildWeeklyPoints(profile, license.rankId, weekData.weekKey, weekData.points);
     }
 
-    checkAndAwardBadges(profile);
+    playGuildQuestCoin(); // 依頼達成のコイン獲得音
+    const newBadges = checkAndAwardBadges(profile);
+    if (newBadges.length > 0) playBadgeGet();
   }
   return newlyCompleted;
 }
@@ -267,7 +270,12 @@ function openGuildRankChange() {
 // 登録/変更どちらの画面からの「もどる」かで戻り先を分ける
 function backFromGuildRegister() {
   playClick();
-  showScreen(isGuildRegistered(state.profile) ? 'guild' : 'subjects');
+  if (isGuildRegistered(state.profile)) {
+    showScreen('guild');
+  } else {
+    fieldOutsideActive = true;
+    showScreen('subjects');
+  }
 }
 
 /* ---------- 画面：冒険者ランク登録・変更 ---------- */
@@ -418,6 +426,7 @@ async function renderGuildRankingScreen() {
   if (prevList.length > 0 && prevList[0].name === state.profile && (prevList[0].points || 0) > 0) {
     const newly = awardBadgeDirect(state.profile, 'guild_rank_1');
     if (newly) {
+      playBadgeGet();
       badgeNotice.style.display = 'block';
       badgeNotice.innerHTML = `<div class="new-badge-line">${newly.icon} 新しいバッジ「${newly.name}」を獲得！（先週の最終結果より）</div>`;
     }

@@ -169,3 +169,43 @@ async function loadGuildWeeklyRanking(weekKey) {
     return [];
   }
 }
+
+/* ---------- 闘技場ランキング ---------- */
+// ドキュメントID = `${プロフィール名}_${制限時間キー}` として、
+// プロフィールごとに「その制限時間での自己ベスト」だけを1件保持する。
+// 呼び出し側（arena.js）で新記録のときだけ呼ぶ想定。
+async function syncArenaResult(profile, timeLimitKey, correctCount, subject, grade) {
+  const ok = await initCloud();
+  if (!ok) return false;
+  try {
+    await cloudDb.collection('arenaRanking').doc(`${profile}_${timeLimitKey}`).set({
+      name: profile,
+      timeLimitKey,
+      correctCount,
+      subject,
+      grade,
+      achievedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return true;
+  } catch (e) {
+    console.warn('闘技場の記録の送信に失敗しました:', e);
+    return false;
+  }
+}
+
+// 指定した制限時間キーのランキングを取得する（上位20件、正解数降順）
+async function loadArenaRanking(timeLimitKey) {
+  const ok = await initCloud();
+  if (!ok) return [];
+  try {
+    const snap = await cloudDb.collection('arenaRanking').where('timeLimitKey', '==', timeLimitKey).limit(50).get();
+    return snap.docs
+      .map(d => d.data())
+      .sort((a, b) => (b.correctCount || 0) - (a.correctCount || 0))
+      .slice(0, 20);
+  } catch (e) {
+    console.warn('闘技場ランキングの取得に失敗しました:', e);
+    return [];
+  }
+}
+

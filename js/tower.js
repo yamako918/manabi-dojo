@@ -298,6 +298,7 @@ function completeTowerRun(cleared) {
 
   // バッジ判定（既存のBADGE_DEFS + buildBadgeContextの仕組みに乗せる）
   const newBadges = checkAndAwardBadges(profile);
+  if (newBadges.length > 0) playBadgeGet();
   renderTowerResultScreen(cleared, newBadges);
   showScreen('tower-result');
 }
@@ -350,7 +351,12 @@ function renderTowerResultScreen(cleared, newBadges) {
   }
 }
 
-/* ---------- ホーム画面：「場外へ」トグル ---------- */
+/* ---------- ホーム画面：「道場からでる」トグル ---------- */
+// 道場の外（文明の塔・ギルドの一覧）を表示中かどうかを記憶しておく。
+// 塔・ギルドの各画面から「もどる」で戻ってきたときも、道場（算数〜英語）
+// ではなくこちらの一覧が再表示されるようにするためのフラグ。
+let fieldOutsideActive = false;
+
 function updateTowerToggleVisibility() {
   const btn = document.getElementById('towerToggleBtn');
   const subjectsWrap = document.getElementById('subjectCardsWrap');
@@ -358,24 +364,30 @@ function updateTowerToggleVisibility() {
   if (!btn || !subjectsWrap || !towerEntryWrap) return;
   const unlocked = isTowerUnlocked(state.profile);
   btn.style.display = unlocked ? 'block' : 'none';
-  btn.textContent = '🚪 道場からでる';
-  subjectsWrap.style.display = 'flex';
-  towerEntryWrap.style.display = 'none';
+  if (fieldOutsideActive && unlocked) {
+    subjectsWrap.style.display = 'none';
+    towerEntryWrap.style.display = 'flex';
+    btn.textContent = '🏠 道場へもどる';
+  } else {
+    fieldOutsideActive = false; // 未解禁時に誤ってフラグが残らないようにする
+    subjectsWrap.style.display = 'flex';
+    towerEntryWrap.style.display = 'none';
+    btn.textContent = '🚪 道場からでる';
+  }
 }
 
 function toggleFieldOutside() {
   playClick();
-  const subjectsWrap = document.getElementById('subjectCardsWrap');
-  const towerEntryWrap = document.getElementById('towerEntryWrap');
-  const btn = document.getElementById('towerToggleBtn');
-  const showingTowerEntry = towerEntryWrap.style.display !== 'none';
-  if (showingTowerEntry) {
-    towerEntryWrap.style.display = 'none';
-    subjectsWrap.style.display = 'flex';
-    btn.textContent = '🚪 道場からでる';
-  } else {
-    subjectsWrap.style.display = 'none';
-    towerEntryWrap.style.display = 'flex';
-    btn.textContent = '🏠 道場へもどる';
-  }
+  fieldOutsideActive = !fieldOutsideActive;
+  updateTowerToggleVisibility();
 }
+
+// 文明の塔・ギルドの画面から「もどる」で戻るときに使う。
+// 道場（算数〜英語）ではなく、文明の塔・ギルドの一覧を表示した状態で
+// subjects画面に戻る。
+function backToFieldOutside() {
+  playClick();
+  fieldOutsideActive = true;
+  showScreen('subjects');
+}
+

@@ -449,6 +449,11 @@
         <h2>ギルド</h2>
         <p>冒険者として登録し、日々の依頼でギルドポイントを稼ごう</p>
       </div>
+      <div class="grade-card" style="--stripe:#B03A3A;" onclick="openArena();">
+        <div class="kanji">闘</div>
+        <h2>闘技場</h2>
+        <p>科目・学年・制限時間を選び、正解数を競う腕試し</p>
+      </div>
     </div>
 
     <div class="last-record" id="lastRecord" style="display:none;"></div>
@@ -496,7 +501,7 @@
 
   <!-- TOWER SUBJECT: 塔（科目）選択 -->
   <div class="screen" id="screen-tower-subject">
-    <button class="backbtn" onclick="playClick();showScreen('subjects');">もどる</button>
+    <button class="backbtn" onclick="backToFieldOutside()">もどる</button>
     <div id="towerSubjectList" style="display:flex; flex-direction:column; gap:14px;"></div>
   </div>
 
@@ -614,7 +619,7 @@
 
   <!-- GUILD: ダッシュボード（ライセンス・今日の依頼・週間ポイント） -->
   <div class="screen" id="screen-guild">
-    <button class="backbtn" onclick="playClick();showScreen('subjects');">もどる</button>
+    <button class="backbtn" onclick="backToFieldOutside()">もどる</button>
     <div class="grade-card" id="guildLicenseCard" style="cursor:default;"></div>
     <button class="switch-link" style="align-self:flex-start; padding-left:2px;" onclick="openGuildRankChange()">ランクを変更する</button>
     <div class="last-record" id="guildWeekPoints"></div>
@@ -633,6 +638,57 @@
     <div class="new-badge-notice" id="guildRankingBadgeNotice" style="display:none;"></div>
     <div class="cat-list" id="guildRankingList"></div>
   </div>
+
+  <!-- ARENA SUBJECT: 闘技場・科目選択 -->
+  <div class="screen" id="screen-arena-subject">
+    <button class="backbtn" onclick="backToFieldOutside()">もどる</button>
+    <button class="btn btn-outline" onclick="playClick();showScreen('arena-ranking');">🏆 闘技場のランキング</button>
+    <div id="arenaSubjectList" style="display:flex; flex-direction:column; gap:14px;"></div>
+  </div>
+
+  <!-- ARENA GRADE: 闘技場・学年選択 -->
+  <div class="screen" id="screen-arena-grade">
+    <button class="backbtn" onclick="playClick();showScreen('arena-subject');">もどる</button>
+    <div class="grade-card" id="arenaGradeHeader" style="cursor:default;"></div>
+    <div class="cat-list" id="arenaGradeList"></div>
+  </div>
+
+  <!-- ARENA TIMELIMIT: 闘技場・制限時間選択 -->
+  <div class="screen" id="screen-arena-timelimit">
+    <button class="backbtn" onclick="playClick();showScreen('arena-grade');">もどる</button>
+    <div class="grade-card" id="arenaTimeLimitHeader" style="cursor:default;"></div>
+    <div class="cat-list" id="arenaTimeLimitList"></div>
+  </div>
+
+  <!-- ARENA RESULT: 闘技場の挑戦けっか -->
+  <div class="screen" id="screen-arena-result">
+    <div class="cert">
+      <div class="eyebrow" id="arenaResultEyebrow">ARENA CHALLENGE</div>
+      <h2 id="arenaResultTitle">けっか</h2>
+      <div class="rankwrap">
+        <div class="hanko">挑戦</div>
+        <div class="rankname" id="arenaResultRank"></div>
+      </div>
+      <div class="meta" id="arenaResultMeta"></div>
+      <div class="new-badge-notice" id="arenaNewBadgeNotice" style="display:none;"></div>
+    </div>
+    <div class="cert-actions">
+      <button class="btn btn-review" id="arenaReviewBtn" style="display:none;" onclick="reviewMissed()"></button>
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="playClick();showScreen('arena-ranking');">ランキングを見る</button>
+        <button class="btn btn-primary" onclick="retryArenaRound()">もう一度挑戦</button>
+      </div>
+      <button class="btn btn-outline" onclick="backToFieldOutside()">闘技場のトップへ</button>
+    </div>
+  </div>
+
+  <!-- ARENA RANKING: 闘技場ランキング（1分間・3分間） -->
+  <div class="screen" id="screen-arena-ranking">
+    <button class="backbtn" onclick="playClick();showScreen('arena-subject');">もどる</button>
+    <div style="display:flex; gap:8px;" id="arenaRankingTabs"></div>
+    <div class="leaderboard-notice" id="arenaRankingNotice" style="display:none;"></div>
+    <div class="cat-list" id="arenaRankingList"></div>
+  </div>
 </div>
 
 <!-- JavaScript モジュール -->
@@ -645,6 +701,7 @@
 <script src="js/generator.js"></script>
 <script src="js/tower.js"></script>
 <script src="js/guild.js"></script>
+<script src="js/arena.js"></script>
 <script src="js/firebase-config.js"></script>
 <script src="js/cloud.js"></script>
 <script src="js/ui.js"></script>

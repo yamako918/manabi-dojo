@@ -132,6 +132,7 @@ function deleteProfile(name) {
 function selectProfile(name) {
   playClick();
   state.profile = name;
+  fieldOutsideActive = false; // 別プロフィールの前回の表示状態を引き継がないようにする
   showScreen('subjects');
 }
 
@@ -139,6 +140,7 @@ function selectProfile(name) {
 function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + name).classList.add('active');
+  switchBGM(bgmThemeForScreen(name));
   if (name === 'profile') renderProfileList();
   if (name === 'subjects') {
     document.getElementById('profileWelcome').textContent = state.profile || '';
@@ -157,6 +159,10 @@ function showScreen(name) {
   if (name === 'guild-register') renderGuildRegisterScreen();
   if (name === 'guild') renderGuildScreen();
   if (name === 'guild-ranking') renderGuildRankingScreen();
+  if (name === 'arena-subject') renderArenaSubjectScreen();
+  if (name === 'arena-grade') renderArenaGradeScreen();
+  if (name === 'arena-timelimit') renderArenaTimeLimitScreen();
+  if (name === 'arena-ranking') renderArenaRankingScreen();
 }
 
 function goToRecords() {
@@ -1026,6 +1032,11 @@ function quitQuiz() {
     showScreen('tower-subject');
     return;
   }
+  if (state.mode === 'arena') {
+    state.arenaFinished = true; // 中断後にタイマーが遅れて発火しても二重処理しないようにする
+    showScreen('arena-subject');
+    return;
+  }
   if (state.subject === 'math') {
     renderCategoryList();
   } else {
@@ -1140,6 +1151,16 @@ function clearScratchpad() {
 
 function nextQuestion() {
   state.locked = false;
+
+  if (state.mode === 'arena' && !state.sessionQueue[state.qIndex]) {
+    const q = drawNextArenaQuestion();
+    if (!q) {
+      finishArenaRound('exhausted');
+      return;
+    }
+    state.sessionQueue[state.qIndex] = q;
+  }
+
   if (state.qIndex >= state.total) {
     if (state.mode === 'tower') {
       finishTowerFloor();
@@ -1162,8 +1183,14 @@ function nextQuestion() {
 
   document.getElementById('qCatLabel').textContent = state.catName;
   document.getElementById('qText').innerHTML = q.qHTML;
-  document.getElementById('qCounter').textContent = `第${state.qIndex + 1}問 / ${state.total}`;
-  document.getElementById('qProgressFill').style.width = `${(state.qIndex / state.total) * 100}%`;
+  if (state.mode === 'arena') {
+    document.getElementById('qCounter').textContent = `正解 ${state.correctCount}問`;
+    const pct = state.arenaTimeLimit > 0 ? (state.arenaRemainingSec / state.arenaTimeLimit) * 100 : 0;
+    document.getElementById('qProgressFill').style.width = `${Math.max(pct, 0)}%`;
+  } else {
+    document.getElementById('qCounter').textContent = `第${state.qIndex + 1}問 / ${state.total}`;
+    document.getElementById('qProgressFill').style.width = `${(state.qIndex / state.total) * 100}%`;
+  }
   document.getElementById('feedbackText').innerHTML =
     q.type !== 'choice' && q.hint ? `<span>${q.hint}</span>` : '';
 
@@ -1252,6 +1279,11 @@ function handleResult(ok) {
     if (state.mode === 'tower') {
       state.towerFloorMisses++;
       updateTowerLivesHUD();
+      playTowerLifeLost();
+    }
+    if (state.mode === 'arena') {
+      state.arenaRemainingSec = Math.max(state.arenaRemainingSec - ARENA_WRONG_PENALTY_SEC, 0);
+      updateArenaTimerDisplay();
     }
   }
   showMark(ok);
@@ -1270,6 +1302,11 @@ function handleResult(ok) {
       setTimeout(expelFromTower, 2400);
       return;
     }
+  }
+
+  if (state.mode === 'arena' && state.arenaRemainingSec <= 0) {
+    setTimeout(() => finishArenaRound('timeup'), ok ? 700 : 1200);
+    return;
   }
 
   setTimeout(nextQuestion, ok ? 700 : 2400);
@@ -1376,6 +1413,7 @@ function finishQuiz() {
   const newBadges = checkAndAwardBadges(state.profile);
   const badgeNotice = document.getElementById('newBadgeNotice');
   if (newBadges.length > 0) {
+    playBadgeGet();
     badgeNotice.style.display = 'block';
     badgeNotice.innerHTML = newBadges
       .map(b => `<div class="new-badge-line">${b.icon} 新しいバッジ「${b.name}」を獲得！</div>`)
