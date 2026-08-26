@@ -149,6 +149,7 @@ function showScreen(name) {
     renderWeakButton();
     checkNewCheers();
     updateTowerToggleVisibility();
+    renderFamilyFeedDigest();
   }
   if (name === 'records') renderRecords();
   if (name === 'achievement') renderAchievement();
@@ -164,6 +165,7 @@ function showScreen(name) {
   if (name === 'arena-grade') renderArenaGradeScreen();
   if (name === 'arena-timelimit') renderArenaTimeLimitScreen();
   if (name === 'arena-ranking') renderArenaRankingScreen();
+  if (name === 'family-feed') renderFamilyFeedScreen();
 }
 
 function goToRecords() {
@@ -1413,12 +1415,25 @@ function finishQuiz() {
   // 実績バッジの判定（累計データに基づくため、モードを問わず毎回チェックする）
   const newBadges = checkAndAwardBadges(state.profile);
   const badgeNotice = document.getElementById('newBadgeNotice');
+  const certHighlightBtn = document.getElementById('certHighlightBtn');
+  certHighlightBtn.style.display = 'none';
+  certHighlightBtn.disabled = false;
+  certHighlightBtn.textContent = '⭐ タイムラインでハイライトする';
+  lastQuizFeedEntryId = null;
   if (newBadges.length > 0) {
     playBadgeGet();
     badgeNotice.style.display = 'block';
     badgeNotice.innerHTML = newBadges
       .map(b => `<div class="new-badge-line">${b.icon} 新しいバッジ「${b.name}」を獲得！</div>`)
       .join('');
+    if (isCloudConfigured()) {
+      newBadges.forEach(b => {
+        postFeedEvent(state.profile, 'badge', `「${b.name}」バッジを獲得！`, b.desc, b.icon, id => {
+          lastQuizFeedEntryId = id;
+          certHighlightBtn.style.display = 'block';
+        });
+      });
+    }
   } else {
     badgeNotice.style.display = 'none';
     badgeNotice.innerHTML = '';
@@ -1496,5 +1511,97 @@ if ('serviceWorker' in navigator) {
         });
       })
       .catch(() => {});
+  });
+}
+
+/* ============================================================
+   できごとタイムライン
+   ============================================================ */
+let lastQuizFeedEntryId = null; // 直近の通常クイズ結果画面で投稿したバッジのできごとID
+
+async function highlightLastQuizFeedEvent(btn) {
+  playClick();
+  if (!lastQuizFeedEntryId) return;
+  const ok = await highlightFeedEvent(lastQuizFeedEntryId);
+  if (ok) {
+    btn.textContent = '⭐ ハイライトしました';
+    btn.disabled = true;
+  }
+}
+
+// ホーム画面に、直近1件のできごとをちらっと表示する（タップで全体表示へ）
+async function renderFamilyFeedDigest() {
+  const box = document.getElementById('familyFeedDigest');
+  if (!box) return;
+  if (!isCloudConfigured()) {
+    box.style.display = 'none';
+    return;
+  }
+  const entry = await loadLatestFeedEntry();
+  if (!entry) {
+    box.style.display = 'none';
+    return;
+  }
+  box.style.display = 'block';
+  box.innerHTML = `${entry.icon || '🎉'} 最新のできごと：<b>${entry.profile}</b>さんが${entry.title}`;
+}
+
+async function renderFamilyFeedScreen() {
+  const notice = document.getElementById('familyFeedNotice');
+  const wrap = document.getElementById('familyFeedList');
+  if (!isCloudConfigured()) {
+    notice.style.display = 'block';
+    notice.textContent = 'クラウド連携がまだ設定されていないため、できごとタイムラインは表示できません。';
+    wrap.innerHTML = '';
+    return;
+  }
+  notice.style.display = 'none';
+  wrap.innerHTML = `<div class="footnote" style="padding:14px 0;">読み込み中…</div>`;
+
+  const entries = await loadFamilyFeed();
+  if (entries.length === 0) {
+    wrap.innerHTML = `<div class="footnote" style="padding:14px 0;">まだできごとがありません。バッジを取ったり、塔を踏破したり、闘技場で自己ベストを更新すると、ここに流れます。</div>`;
+    return;
+  }
+
+  // リアクション集計は各できごとごとに問い合わせが必要なので、まとめて並行取得する
+  const reactionCountsList = await Promise.all(entries.map(e => loadFeedReactionCounts(e.id)));
+
+  wrap.innerHTML = '';
+  entries.forEach((entry, i) => {
+    const counts = reactionCountsList[i];
+    const d = entry.createdAt && typeof entry.createdAt.toDate === 'function' ? entry.createdAt.toDate() : null;
+    const dateStr = d ? `${d.getMonth() + 1}/${d.getDate()}` : '';
+    const countsHTML = Object.entries(counts)
+      .map(([emoji, count]) => `${emoji}${count}`)
+      .join(' ');
+
+    const card = document.createElement('div');
+    card.className = 'cat-card';
+    card.style.flexDirection = 'column';
+    card.style.alignItems = 'stretch';
+    if (entry.highlighted) {
+      card.style.border = '2px solid var(--gold)';
+      card.style.background = 'rgba(201,138,44,0.08)';
+    }
+    card.innerHTML = `
+      <div class="cat-body">
+        <h3>${entry.highlighted ? '⭐ ' : ''}${entry.icon || ''} ${entry.profile}さん</h3>
+        <span>${entry.title}${entry.detail ? '　' + entry.detail : ''}　${dateStr}</span>
+      </div>
+      <div class="cheer-row" style="margin-top:6px;">
+        ${FEED_REACTION_EMOJIS.map(e => `<button class="cheer-btn" data-emoji="${e}">${e}</button>`).join('')}
+      </div>
+      ${countsHTML ? `<div class="footnote" style="text-align:left; padding:4px 0 0;">${countsHTML}</div>` : ''}
+    `;
+    card.querySelectorAll('.cheer-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        playClick();
+        btn.disabled = true;
+        const ok = await sendFeedReaction(state.profile, entry.id, btn.dataset.emoji);
+        btn.textContent = ok ? btn.dataset.emoji + '済' : btn.dataset.emoji;
+      });
+    });
+    wrap.appendChild(card);
   });
 }

@@ -12,6 +12,7 @@
    ============================================================ */
 
 const TOWER_TOTAL_FLOORS = 5;
+let lastTowerFeedEntryId = null; // 直近の塔踏破結果画面で投稿したできごとID（ハイライトボタン用）
 const TOWER_QUESTIONS_PER_FLOOR = 20;
 
 // 階ごとの出題学年（questions.js/generator.js/expansion*.js のグレードキーと共通）
@@ -438,8 +439,44 @@ function completeTowerRun(cleared) {
   // バッジ判定（既存のBADGE_DEFS + buildBadgeContextの仕組みに乗せる）
   const newBadges = checkAndAwardBadges(profile);
   if (newBadges.length > 0) playBadgeGet();
+
+  const towerHighlightBtn = document.getElementById('towerResultHighlightBtn');
+  towerHighlightBtn.style.display = 'none';
+  towerHighlightBtn.disabled = false;
+  towerHighlightBtn.textContent = '⭐ タイムラインでハイライトする';
+  lastTowerFeedEntryId = null;
+
+  if (isCloudConfigured()) {
+    // 塔の踏破そのものをタイムラインへ（ハイライトの対象はこちらを優先する）
+    if (cleared) {
+      postFeedEvent(
+        profile,
+        'tower',
+        '文明の塔を制覇！',
+        `${SUBJECT_LABEL[subject]}・${TOWER_DIFFICULTY[difficulty].label}`,
+        '🗼',
+        id => {
+          lastTowerFeedEntryId = id;
+          towerHighlightBtn.style.display = 'block';
+        }
+      );
+    }
+    // このタイミングで獲得した新規バッジも合わせて投稿する
+    postBadgeFeedEvents(profile, newBadges);
+  }
+
   renderTowerResultScreen(cleared, newBadges);
   showScreen('tower-result');
+}
+
+async function highlightLastTowerFeedEvent(btn) {
+  playClick();
+  if (!lastTowerFeedEntryId) return;
+  const ok = await highlightFeedEvent(lastTowerFeedEntryId);
+  if (ok) {
+    btn.textContent = '⭐ ハイライトしました';
+    btn.disabled = true;
+  }
 }
 
 function renderTowerResultScreen(cleared, newBadges) {

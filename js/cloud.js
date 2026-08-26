@@ -273,3 +273,128 @@ async function loadTowerMonument() {
   }
 }
 
+/* ============================================================
+   できごとタイムライン（家族のみんなのできごとを自動で共有する）
+   ・バッジ獲得・文明の塔の踏破・闘技場の自己ベスト更新を自動投稿する
+   ・投稿した本人はあとから1件だけ「ハイライト」でき、
+     タイムラインの先頭に優先表示される
+   ・リアクションは既存の応援スタンプ（CHEER_EMOJIS）とは別の
+     達成向けパレット（FEED_REACTION_EMOJIS）を使う
+   ============================================================ */
+// 新しく獲得したバッジ一覧を、まとめてタイムラインへ投稿する共通ヘルパー。
+// クイズ・文明の塔・ギルドなど、バッジ獲得が起こりうるどの箇所からも同じ形で呼べる。
+function postBadgeFeedEvents(profile, badges) {
+  if (!isCloudConfigured() || !badges || badges.length === 0) return;
+  badges.forEach(b => {
+    postFeedEvent(profile, 'badge', `「${b.name}」バッジを獲得！`, b.desc, b.icon);
+  });
+}
+
+const FEED_REACTION_EMOJIS = ['🎉', '👍', '🔥', '💪', '😊', '⭐', '🏆', '👑', '🙌'];
+
+// 非同期だが呼び出し元をブロックしない（fire-and-forget）。
+// 投稿が完了したら、渡されたコールバックにドキュメントIDを渡す
+// （ハイライトボタンを有効化する際などに使う）。
+function postFeedEvent(profile, kind, title, detail, icon, onPosted) {
+  (async () => {
+    const ok = await initCloud();
+    if (!ok) return;
+    try {
+      const docRef = await cloudDb.collection('familyFeed').add({
+        profile,
+        kind,
+        title,
+        detail: detail || '',
+        icon: icon || '🎉',
+        highlighted: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      if (onPosted) onPosted(docRef.id);
+    } catch (e) {
+      console.warn('タイムラインへの投稿に失敗しました:', e);
+    }
+  })();
+}
+
+// 最新30件を取得する。ハイライトされたものを先頭のまとまりに、
+// それ以外は新しい順のまま表示する（安定ソートなので各まとまり内の順序は保たれる）。
+async function loadFamilyFeed() {
+  const ok = await initCloud();
+  if (!ok) return [];
+  try {
+    const snap = await cloudDb.collection('familyFeed').orderBy('createdAt', 'desc').limit(30).get();
+    const entries = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    entries.sort((a, b) => (b.highlighted ? 1 : 0) - (a.highlighted ? 1 : 0));
+    return entries;
+  } catch (e) {
+    console.warn('タイムラインの取得に失敗しました:', e);
+    return [];
+  }
+}
+
+// ホーム画面のダイジェスト表示用：最新1件だけを軽量に取得する
+// （ハイライトの有無に関わらず、純粋に一番新しいできごとを返す）
+async function loadLatestFeedEntry() {
+  const ok = await initCloud();
+  if (!ok) return null;
+  try {
+    const snap = await cloudDb.collection('familyFeed').orderBy('createdAt', 'desc').limit(1).get();
+    if (snap.empty) return null;
+    const doc = snap.docs[0];
+    return { id: doc.id, ...doc.data() };
+  } catch (e) {
+    console.warn('最新のできごとの取得に失敗しました:', e);
+    return null;
+  }
+}
+
+// 自分の投稿を1件ハイライトする（一方向のみ、解除は用意しない）
+async function highlightFeedEvent(entryId) {
+  const ok = await initCloud();
+  if (!ok || !entryId) return false;
+  try {
+    await cloudDb.collection('familyFeed').doc(entryId).update({ highlighted: true });
+    return true;
+  } catch (e) {
+    console.warn('ハイライトの設定に失敗しました:', e);
+    return false;
+  }
+}
+
+// 指定したできごとへリアクションを送る
+async function sendFeedReaction(from, entryId, emoji) {
+  if (!FEED_REACTION_EMOJIS.includes(emoji)) return false;
+  const ok = await initCloud();
+  if (!ok) return false;
+  try {
+    await cloudDb.collection('feedReactions').add({
+      entryId,
+      from,
+      emoji,
+      sentAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return true;
+  } catch (e) {
+    console.warn('リアクションの送信に失敗しました:', e);
+    return false;
+  }
+}
+
+// 指定したできごとに対するリアクションを絵文字ごとに集計して返す（例: {'🎉': 2, '👍': 1}）
+async function loadFeedReactionCounts(entryId) {
+  const ok = await initCloud();
+  if (!ok) return {};
+  try {
+    const snap = await cloudDb.collection('feedReactions').where('entryId', '==', entryId).limit(100).get();
+    const counts = {};
+    snap.docs.forEach(d => {
+      const emoji = d.data().emoji;
+      counts[emoji] = (counts[emoji] || 0) + 1;
+    });
+    return counts;
+  } catch (e) {
+    console.warn('リアクション集計の取得に失敗しました:', e);
+    return {};
+  }
+}
+

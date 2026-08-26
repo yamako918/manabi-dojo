@@ -71,6 +71,7 @@ function registerGuildLicense(profile, rankId) {
   saveGuildLicense(profile, { rankId, registeredAt, rankChangedAt: Date.now() });
   const newBadges = checkAndAwardBadges(profile); // 「ギルド登録」バッジ判定
   if (newBadges.length > 0) playBadgeGet();
+  postBadgeFeedEvents(profile, newBadges);
 }
 
 /* ---------- 累計進捗（依頼達成数・累計ポイント） ---------- */
@@ -234,6 +235,7 @@ function evaluateGuildQuests(profile, eventInfo) {
     playGuildQuestCoin(); // 依頼達成のコイン獲得音
     const newBadges = checkAndAwardBadges(profile);
     if (newBadges.length > 0) playBadgeGet();
+    postBadgeFeedEvents(profile, newBadges);
   }
   return newlyCompleted;
 }
@@ -496,6 +498,7 @@ async function renderGuildRankingScreen() {
     const newly = awardBadgeDirect(state.profile, 'guild_rank_1');
     if (newly) {
       playBadgeGet();
+      postBadgeFeedEvents(state.profile, [newly]);
       badgeNotice.style.display = 'block';
       badgeNotice.innerHTML = `<div class="new-badge-line">${newly.icon} 新しいバッジ「${newly.name}」を獲得！（先週の最終結果より）</div>`;
     }

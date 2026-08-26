@@ -88,6 +88,44 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // できごとタイムライン（バッジ獲得・塔踏破・闘技場自己ベストを自動投稿）
+    match /familyFeed/{entryId} {
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+        && request.resource.data.profile is string
+        && request.resource.data.profile.size() > 0
+        && request.resource.data.profile.size() <= 20
+        && request.resource.data.kind in ['badge', 'tower', 'arena']
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 100
+        && request.resource.data.highlighted == false
+        && request.resource.data.createdAt == request.time;
+
+      // ハイライトのON操作のみ許可し、それ以外のフィールドの改ざんは防ぐ
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['highlighted'])
+        && request.resource.data.highlighted == true;
+
+      allow delete: if false;
+    }
+
+    // できごとタイムラインへのリアクション（送信のみ許可）
+    match /feedReactions/{reactionId} {
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+        && request.resource.data.entryId is string
+        && request.resource.data.entryId.size() > 0
+        && request.resource.data.from is string
+        && request.resource.data.from.size() > 0
+        && request.resource.data.from.size() <= 20
+        && request.resource.data.emoji in ['🎉', '👍', '🔥', '💪', '😊', '⭐', '🏆', '👑', '🙌']
+        && request.resource.data.sentAt == request.time;
+
+      allow update, delete: if false;
+    }
+
     // 上記以外はすべて拒否
     match /{document=**} {
       allow read, write: if false;

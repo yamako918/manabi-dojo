@@ -297,7 +297,6 @@ function bgmThemeForScreen(screenName) {
   }
   if (screenName === 'tower-subject' || screenName === 'tower-difficulty') return 'tower';
   if (screenName === 'tower-floor-clear' || screenName === 'tower-result' || screenName === 'result') return 'result';
-  if (screenName === 'tower-monument') return 'result';
   if (screenName === 'guild-register' || screenName === 'guild' || screenName === 'guild-ranking') return 'guild';
   if (screenName === 'arena-subject' || screenName === 'arena-grade' || screenName === 'arena-timelimit') return 'tower';
   if (screenName === 'arena-result' || screenName === 'arena-ranking') return 'result';

@@ -146,16 +146,16 @@
   }
 
   .menu-grid{
-    display:grid; grid-template-columns:repeat(4, 1fr); gap:8px;
+    display:grid; grid-template-columns:repeat(5, 1fr); gap:6px;
   }
   .menu-tile{
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     gap:4px; background:var(--card); border:1px solid rgba(31,58,95,0.15);
-    border-radius:12px; padding:10px 4px; font-family:inherit;
+    border-radius:12px; padding:9px 2px; font-family:inherit;
     cursor:pointer; box-shadow:var(--shadow);
   }
-  .menu-tile .menu-tile-icon{ font-size:20px; }
-  .menu-tile .menu-tile-label{ font-size:10.5px; color:var(--ink); font-weight:700; line-height:1.3; }
+  .menu-tile .menu-tile-icon{ font-size:18px; }
+  .menu-tile .menu-tile-label{ font-size:9.5px; color:var(--ink); font-weight:700; line-height:1.25; }
   .records-summary{
     font-size:12.5px; color:var(--ink-soft); text-align:center;
     background:rgba(31,58,95,0.05); border-radius:8px; padding:10px 12px;
@@ -405,8 +405,12 @@
       <button class="menu-tile" onclick="goToLeaderboard()">
         <span class="menu-tile-icon">🌏</span><span class="menu-tile-label">みんな</span>
       </button>
+      <button class="menu-tile" onclick="playClick();showScreen('family-feed');">
+        <span class="menu-tile-icon">📰</span><span class="menu-tile-label">できごと</span>
+      </button>
     </div>
     <div class="cheer-notice" id="cheerNotice" style="display:none;"></div>
+    <div class="last-record" id="familyFeedDigest" style="display:none; cursor:pointer;" onclick="playClick();showScreen('family-feed');"></div>
 
     <button class="btn btn-outline" id="towerToggleBtn" style="display:none;" onclick="toggleFieldOutside()">🚪 冒険へ旅立つ</button>
 
@@ -551,6 +555,7 @@
       <div id="towerFloorBreakdown" class="record-section" style="margin-top:14px;"></div>
       <div class="new-badge-notice" id="towerResultGuildNotice" style="display:none;"></div>
       <div class="new-badge-notice" id="towerNewBadgeNotice" style="display:none;"></div>
+      <button class="btn btn-outline" id="towerResultHighlightBtn" style="display:none; margin-top:8px;" onclick="highlightLastTowerFeedEvent(this)">⭐ タイムラインでハイライトする</button>
     </div>
     <div class="cert-actions">
       <button class="btn btn-review" id="towerReviewBtn" style="display:none;" onclick="reviewMissed()"></button>
@@ -613,6 +618,7 @@
       <div class="meta" id="certMeta"></div>
       <div class="new-badge-notice" id="guildQuestResultNotice" style="display:none;"></div>
       <div class="new-badge-notice" id="newBadgeNotice" style="display:none;"></div>
+      <button class="btn btn-outline" id="certHighlightBtn" style="display:none; margin-top:8px;" onclick="highlightLastQuizFeedEvent(this)">⭐ タイムラインでハイライトする</button>
     </div>
     <div class="cert-actions">
       <button class="btn btn-review" id="reviewBtn" style="display:none;" onclick="reviewMissed()"></button>
@@ -692,6 +698,7 @@
       </div>
       <div class="meta" id="arenaResultMeta"></div>
       <div class="new-badge-notice" id="arenaNewBadgeNotice" style="display:none;"></div>
+      <button class="btn btn-outline" id="arenaResultHighlightBtn" style="display:none; margin-top:8px;" onclick="highlightLastArenaFeedEvent(this)">⭐ タイムラインでハイライトする</button>
     </div>
     <div class="cert-actions">
       <button class="btn btn-review" id="arenaReviewBtn" style="display:none;" onclick="reviewMissed()"></button>
@@ -709,6 +716,14 @@
     <div style="display:flex; gap:8px;" id="arenaRankingTabs"></div>
     <div class="leaderboard-notice" id="arenaRankingNotice" style="display:none;"></div>
     <div class="cat-list" id="arenaRankingList"></div>
+  </div>
+
+  <!-- FAMILY FEED: できごとタイムライン（バッジ獲得・塔踏破・闘技場自己ベストの自動投稿） -->
+  <div class="screen" id="screen-family-feed">
+    <button class="backbtn" onclick="backToFieldOutside()">もどる</button>
+    <div class="footnote">バッジ獲得・塔の踏破・闘技場の自己ベスト更新が自動で流れます</div>
+    <div class="leaderboard-notice" id="familyFeedNotice" style="display:none;"></div>
+    <div id="familyFeedList" style="display:flex; flex-direction:column; gap:10px;"></div>
   </div>
 </div>
 

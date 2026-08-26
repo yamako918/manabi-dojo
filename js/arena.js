@@ -17,6 +17,7 @@ const ARENA_TIME_LIMITS = { '1min': 60, '3min': 180 };
 const ARENA_TIME_LIMIT_LABEL = { '1min': '1分間', '3min': '3分間' };
 const ARENA_TIME_LIMIT_ORDER = ['1min', '3min'];
 const ARENA_WRONG_PENALTY_SEC = 5;
+let lastArenaFeedEntryId = null; // 直近の闘技場結果画面で投稿したできごとID（ハイライトボタン用）
 const ARENA_SUBJECT_KANJI = { math: '算', kokugo: '国', science: '理', social: '社', english: '英' };
 
 let arenaRankingTab = '1min'; // ランキング画面でどちらの時間帯を表示中か
@@ -307,8 +308,43 @@ function finishArenaRound(reason) {
   const newBadges = checkAndAwardBadges(profile);
   if (newBadges.length > 0) playBadgeGet();
 
+  const arenaHighlightBtn = document.getElementById('arenaResultHighlightBtn');
+  arenaHighlightBtn.style.display = 'none';
+  arenaHighlightBtn.disabled = false;
+  arenaHighlightBtn.textContent = '⭐ タイムラインでハイライトする';
+  lastArenaFeedEntryId = null;
+
+  if (isCloudConfigured()) {
+    // 自己ベスト更新そのものをタイムラインへ（ハイライトの対象はこちらを優先する）
+    if (isNewLocalBest) {
+      postFeedEvent(
+        profile,
+        'arena',
+        '闘技場で自己ベスト更新！',
+        `${SUBJECT_LABEL[subject]}・${GRADE_LABEL[grade]}・${ARENA_TIME_LIMIT_LABEL[timeLimitKey]}で${correctCount}問正解`,
+        '⚔️',
+        id => {
+          lastArenaFeedEntryId = id;
+          arenaHighlightBtn.style.display = 'block';
+        }
+      );
+    }
+    // このタイミングで獲得した新規バッジも合わせて投稿する
+    postBadgeFeedEvents(profile, newBadges);
+  }
+
   renderArenaResultScreen(isNewLocalBest, newBadges);
   showScreen('arena-result');
+}
+
+async function highlightLastArenaFeedEvent(btn) {
+  playClick();
+  if (!lastArenaFeedEntryId) return;
+  const ok = await highlightFeedEvent(lastArenaFeedEntryId);
+  if (ok) {
+    btn.textContent = '⭐ ハイライトしました';
+    btn.disabled = true;
+  }
 }
 
 function renderArenaResultScreen(isNewLocalBest, newBadges) {
