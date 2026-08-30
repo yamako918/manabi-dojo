@@ -46,6 +46,62 @@ function initCloud() {
   return cloudInitPromise;
 }
 
+/* ============================================================
+   同期の再送キュー
+   ・オフラインや通信エラーで送信に失敗したデータを、次にオンラインに
+     なったタイミングや、次回何かクラウドへ送信するタイミングで
+     まとめて再送する。
+   ・対象は「あとから同じ引数で呼び直せば安全」な送信系関数のみ
+     （postFeedEventはコールバック引数を取るため対象外）。
+   ============================================================ */
+const SYNC_RETRY_QUEUE_KEY = 'kd-sync-retry-queue';
+const SYNC_RETRY_QUEUE_MAX = 50; // 際限なく溜まらないよう上限を設ける
+
+function loadSyncRetryQueue() {
+  try {
+    return JSON.parse(localStorage.getItem(SYNC_RETRY_QUEUE_KEY)) || [];
+  } catch (e) {
+    return [];
+  }
+}
+function saveSyncRetryQueue(queue) {
+  localStorage.setItem(SYNC_RETRY_QUEUE_KEY, JSON.stringify(queue.slice(-SYNC_RETRY_QUEUE_MAX)));
+}
+function enqueueSyncRetry(fnName, args) {
+  const queue = loadSyncRetryQueue();
+  queue.push({ fnName, args, queuedAt: Date.now() });
+  saveSyncRetryQueue(queue);
+}
+
+// 再送対象にできる関数の一覧（キーは enqueueSyncRetry に渡す fnName と一致させる）
+function getSyncRetryFunctionMap() {
+  return {
+    syncGuildWeeklyPoints,
+    syncArenaResult,
+    syncTowerConquest
+  };
+}
+
+// キューに溜まった送信をまとめて再試行する。成功したものだけキューから取り除く。
+async function flushSyncRetryQueue() {
+  if (!isCloudConfigured()) return;
+  const queue = loadSyncRetryQueue();
+  if (queue.length === 0) return;
+  const fnMap = getSyncRetryFunctionMap();
+  const remaining = [];
+  for (const item of queue) {
+    const fn = fnMap[item.fnName];
+    if (!fn) continue; // 未知の関数名（将来のバージョン差異など）は諦めて捨てる
+    try {
+      const ok = await fn(...item.args);
+      if (!ok) remaining.push(item);
+    } catch (e) {
+      remaining.push(item);
+    }
+  }
+  saveSyncRetryQueue(remaining);
+}
+
 // このプロフィールの現在の状況をリーダーボードへ送信する
 async function syncLeaderboard(profile) {
   const ok = await initCloud();
@@ -148,6 +204,7 @@ async function syncGuildWeeklyPoints(profile, rankId, weekKey, points) {
     return true;
   } catch (e) {
     console.warn('ギルドポイントの送信に失敗しました:', e);
+    enqueueSyncRetry('syncGuildWeeklyPoints', [profile, rankId, weekKey, points]);
     return false;
   }
 }
@@ -189,6 +246,7 @@ async function syncArenaResult(profile, timeLimitKey, correctCount, subject, gra
     return true;
   } catch (e) {
     console.warn('闘技場の記録の送信に失敗しました:', e);
+    enqueueSyncRetry('syncArenaResult', [profile, timeLimitKey, correctCount, subject, grade]);
     return false;
   }
 }
@@ -227,6 +285,7 @@ async function syncTowerConquest(profile, subject, difficulty, reachedFloor) {
     return true;
   } catch (e) {
     console.warn('塔踏破記録の送信に失敗しました:', e);
+    enqueueSyncRetry('syncTowerConquest', [profile, subject, difficulty, reachedFloor]);
     return false;
   }
 }
@@ -395,6 +454,46 @@ async function loadFeedReactionCounts(entryId) {
   } catch (e) {
     console.warn('リアクション集計の取得に失敗しました:', e);
     return {};
+  }
+}
+
+/* ============================================================
+   家族協力イベント
+   ・ギルドと同じ週境界（guildWeekKey）で、家族全員（別端末含む）の
+     通常クイズの正解数を合計し、目標に到達すると特別なできごととして
+     タイムラインに投稿する。
+   ・個人の成果ではなく家族全体の協力目標のため、特定プロフィールの
+     バッジにはしない。
+   ・FieldValue.increment()を使い、複数端末からの同時加算でも
+     取りこぼしなく合算できるようにする。
+   ============================================================ */
+async function incrementFamilyWeeklyGoal(weekKey, amount) {
+  const ok = await initCloud();
+  if (!ok) return false;
+  try {
+    await cloudDb.collection('familyGoal').doc(weekKey).set(
+      {
+        weekKey,
+        totalCorrect: firebase.firestore.FieldValue.increment(amount)
+      },
+      { merge: true }
+    );
+    return true;
+  } catch (e) {
+    console.warn('家族協力目標の更新に失敗しました:', e);
+    return false;
+  }
+}
+
+async function loadFamilyWeeklyGoal(weekKey) {
+  const ok = await initCloud();
+  if (!ok) return null;
+  try {
+    const doc = await cloudDb.collection('familyGoal').doc(weekKey).get();
+    return doc.exists ? doc.data() : { weekKey, totalCorrect: 0 };
+  } catch (e) {
+    console.warn('家族協力目標の取得に失敗しました:', e);
+    return null;
   }
 }
 

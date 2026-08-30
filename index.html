@@ -383,7 +383,7 @@
   <!-- SUBJECTS: 教科選択 -->
   <div class="screen" id="screen-subjects">
     <div class="profile-bar">
-      <span>ようこそ、<b id="profileWelcome"></b>さん</span>
+      <span>ようこそ、<b id="profileWelcome"></b>さん <span id="profileTitleBadge" style="color:var(--gold); font-weight:700;"></span></span>
       <button class="switch-link" onclick="playClick();showScreen('profile')">プロフィールを切り替える</button>
     </div>
     <span class="streak-badge" id="streakBadge" style="display:none;"></span>
@@ -518,6 +518,10 @@
   <div class="screen" id="screen-tower-difficulty">
     <button class="backbtn" onclick="playClick();showScreen('tower-subject');">もどる</button>
     <div class="grade-card" id="towerDifficultyHeader" style="cursor:default;"></div>
+    <label style="display:flex; align-items:center; gap:8px; background:var(--card); border:1px solid rgba(31,58,95,0.15); border-radius:10px; padding:10px 12px; font-size:12.5px; color:var(--ink); box-shadow:var(--shadow);">
+      <input type="checkbox" id="towerInfiniteModeCheckbox" style="width:18px; height:18px; flex-shrink:0;">
+      無限モードで挑戦する（5階を制覇したあとも、行けるところまで続けられます）
+    </label>
     <div class="cat-list" id="towerDifficultyList"></div>
   </div>
 
@@ -539,6 +543,7 @@
     </div>
     <div class="cert-actions">
       <button class="btn btn-primary" id="towerNextFloorBtn" onclick="advanceTowerFloor()"></button>
+      <button class="btn btn-outline" id="towerStopHereBtn" style="display:none;" onclick="stopInfiniteTowerRun()">ここで終わりにする</button>
     </div>
   </div>
 
@@ -648,6 +653,8 @@
     <div class="last-record" id="guildWeekPoints"></div>
     <button class="btn btn-outline" onclick="playClick();showScreen('guild-ranking');">🏆 週間ランキングを見る</button>
     <div class="new-badge-notice" id="guildQuestNotice" style="display:none;"></div>
+    <div class="record-subject-heading" style="--stripe:#C98A2C;">週替わり特別依頼</div>
+    <div class="cat-list" id="guildWeeklyQuestList"></div>
     <div class="record-subject-heading" style="--stripe:#2E6B4A;">今日のギルド依頼</div>
     <div class="cat-list" id="guildQuestList"></div>
     <div class="footnote">依頼は毎日リセットされ、ランダムに3つ表示されます</div>
@@ -722,6 +729,7 @@
   <div class="screen" id="screen-family-feed">
     <button class="backbtn" onclick="backToFieldOutside()">もどる</button>
     <div class="footnote">バッジ獲得・塔の踏破・闘技場の自己ベスト更新が自動で流れます</div>
+    <div class="grade-card" id="familyGoalCard" style="--stripe:#C98A2C; cursor:default; display:none;"></div>
     <div class="leaderboard-notice" id="familyFeedNotice" style="display:none;"></div>
     <div id="familyFeedList" style="display:flex; flex-direction:column; gap:10px;"></div>
   </div>

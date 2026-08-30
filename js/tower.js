@@ -25,6 +25,17 @@ const TOWER_FLOOR_GRADES = [
 ];
 const TOWER_FLOOR_LABEL = [GRADE_LABEL.g6, GRADE_LABEL.g7, GRADE_LABEL.g8, GRADE_LABEL.g9, '中学生すべて'];
 
+// 6階以降（無限モード）は、5階と同じ「中学生すべて」の範囲を使い続ける。
+// 学年別の出題範囲は5階までしか定義していないため、それ以降は最後の階の設定を流用する。
+function getTowerFloorGrades(floorIdx) {
+  if (floorIdx <= TOWER_TOTAL_FLOORS) return TOWER_FLOOR_GRADES[floorIdx - 1];
+  return TOWER_FLOOR_GRADES[TOWER_TOTAL_FLOORS - 1];
+}
+function getTowerFloorLabel(floorIdx) {
+  if (floorIdx <= TOWER_TOTAL_FLOORS) return TOWER_FLOOR_LABEL[floorIdx - 1];
+  return `無限モード${floorIdx}階（中学生すべて）`;
+}
+
 const TOWER_DIFFICULTY = {
   solo: { label: '完璧主義', maxMisses: 0, desc: '1問でも間違えると塔から追い出される' },
   amulet: { label: '魔法のお守り', maxMisses: 2, desc: '各階で2問まで間違えても次の階へ進める（3問目の失敗で追い出される）' },
@@ -85,7 +96,7 @@ function cloneShuffledTagged(item) {
 }
 
 function buildTowerFloorQuestions(subject, floorIdx) {
-  const grades = TOWER_FLOOR_GRADES[floorIdx - 1];
+  const grades = getTowerFloorGrades(floorIdx);
   if (subject === 'math') {
     const catPool = buildTowerMathPool(grades);
     const qs = [];
@@ -250,10 +261,18 @@ function renderTowerSubjectList() {
     div.innerHTML = `
       <div class="kanji">${TOWER_SUBJECT_KANJI[subject]}</div>
       <h2>${SUBJECT_LABEL[subject]}の塔</h2>
-      <p>最高到達：${prog.bestFloor > 0 ? `${prog.bestFloor}階 / 全${TOWER_TOTAL_FLOORS}階` : '未挑戦'}　${clearedLabel}</p>
+      <p>最高到達：${towerBestFloorLabel(prog.bestFloor)}　${clearedLabel}</p>
     `;
     wrap.appendChild(div);
   });
+}
+
+// 最高到達階の表示文言。5階を超えている（無限モードで到達した）場合は
+// 「5階 / 全5階」という誤解を招く表記を避け、無限モードの到達として表示する。
+function towerBestFloorLabel(bestFloor) {
+  if (bestFloor <= 0) return '未挑戦';
+  if (bestFloor <= TOWER_TOTAL_FLOORS) return `${bestFloor}階 / 全${TOWER_TOTAL_FLOORS}階`;
+  return `無限モード${bestFloor}階（制覇＋${bestFloor - TOWER_TOTAL_FLOORS}）`;
 }
 
 function selectTowerSubject(subject) {
@@ -273,6 +292,8 @@ function renderTowerDifficultyScreen() {
     <h2>${SUBJECT_LABEL[subject]}の塔</h2>
     <p>全5階・各階20問（1階:小6 → 2階:中1 → 3階:中2 → 4階:中3 → 5階:中学すべて）</p>
   `;
+  const infiniteToggle = document.getElementById('towerInfiniteModeCheckbox');
+  if (infiniteToggle) infiniteToggle.checked = false; // 毎回、通常モードを既定にする
   const list = document.getElementById('towerDifficultyList');
   list.innerHTML = '';
   Object.keys(TOWER_DIFFICULTY).forEach(diffId => {
@@ -282,7 +303,8 @@ function renderTowerDifficultyScreen() {
     div.className = 'cat-card';
     div.onclick = () => {
       playClick();
-      startTowerRun(subject, diffId);
+      const infiniteMode = infiniteToggle ? infiniteToggle.checked : false;
+      startTowerRun(subject, diffId, infiniteMode);
     };
     div.innerHTML = `
       <div class="cat-body">
@@ -295,9 +317,11 @@ function renderTowerDifficultyScreen() {
 }
 
 /* ---------- 挑戦の開始・階の進行 ---------- */
-function startTowerRun(subject, difficultyId) {
+function startTowerRun(subject, difficultyId, infiniteMode) {
   state.towerSubject = subject;
   state.towerDifficulty = difficultyId;
+  state.towerInfiniteMode = !!infiniteMode;
+  state.towerConquestSynced = false; // 5階制覇の踏破記録を二重送信しないためのフラグ
   state.towerFloorResults = [];
   state.towerLastGuildCompleted = [];
   state.missed = [];
@@ -307,7 +331,7 @@ function startTowerRun(subject, difficultyId) {
 
 function retryTowerRun() {
   playClick();
-  startTowerRun(state.towerSubject, state.towerDifficulty);
+  startTowerRun(state.towerSubject, state.towerDifficulty, state.towerInfiniteMode);
 }
 
 function startTowerFloor(floorIdx) {
@@ -315,7 +339,7 @@ function startTowerFloor(floorIdx) {
   state.towerFloor = floorIdx;
   state.towerFloorMisses = 0;
   state.catId = `tower_${state.towerSubject}_f${floorIdx}`;
-  state.catName = `${SUBJECT_LABEL[state.towerSubject]}の塔　${floorIdx}階（${TOWER_FLOOR_LABEL[floorIdx - 1]}）`;
+  state.catName = `${SUBJECT_LABEL[state.towerSubject]}の塔　${floorIdx}階（${getTowerFloorLabel(floorIdx)}）`;
   state.sessionQueue = buildTowerFloorQuestions(state.towerSubject, floorIdx);
   state.qIndex = 0;
   state.correctCount = 0;
@@ -350,13 +374,24 @@ function finishTowerFloor() {
   playFanfare();
   state.towerFloorResults.push({
     floor: state.towerFloor,
-    grade: TOWER_FLOOR_LABEL[state.towerFloor - 1],
+    grade: getTowerFloorLabel(state.towerFloor),
     correct: state.correctCount,
     total: state.total,
     misses: state.towerFloorMisses,
   });
   state.towerLastGuildCompleted = evaluateGuildQuests(state.profile, { kind: 'tower_floor' });
-  if (state.towerFloor >= TOWER_TOTAL_FLOORS) {
+
+  const clearedBaseTower = state.towerFloor >= TOWER_TOTAL_FLOORS;
+
+  // 5階制覇は無限モードでもこの時点で確定させる（踏破記録は最初の1回だけ送信する）
+  if (clearedBaseTower && !state.towerConquestSynced) {
+    state.towerConquestSynced = true;
+    if (isCloudConfigured()) {
+      syncTowerConquest(state.profile, state.towerSubject, state.towerDifficulty, TOWER_TOTAL_FLOORS);
+    }
+  }
+
+  if (clearedBaseTower && !state.towerInfiniteMode) {
     completeTowerRun(true);
   } else {
     showTowerFloorClearScreen();
@@ -367,7 +402,7 @@ function expelFromTower() {
   clearInterval(state.timerHandle);
   state.towerFloorResults.push({
     floor: state.towerFloor,
-    grade: TOWER_FLOOR_LABEL[state.towerFloor - 1],
+    grade: getTowerFloorLabel(state.towerFloor),
     correct: state.correctCount,
     total: state.total,
     misses: state.towerFloorMisses,
@@ -384,9 +419,23 @@ function showTowerFloorClearScreen() {
     `${SUBJECT_LABEL[state.towerSubject]}の塔　${r.grade}<br>${r.correct} / ${r.total} 問正解（ミス${r.misses}回）`;
   renderGuildQuestNotice(document.getElementById('towerFloorGuildNotice'), state.towerLastGuildCompleted);
   const nextFloor = state.towerFloor + 1;
-  document.getElementById('towerNextFloorBtn').textContent =
-    nextFloor <= TOWER_TOTAL_FLOORS ? `${nextFloor}階へ進む` : '塔を制覇する';
+  const nextBtn = document.getElementById('towerNextFloorBtn');
+  if (nextFloor <= TOWER_TOTAL_FLOORS) {
+    nextBtn.textContent = `${nextFloor}階へ進む`;
+  } else if (state.towerInfiniteMode) {
+    nextBtn.textContent = `${nextFloor}階へ進む（無限モード）`;
+  } else {
+    nextBtn.textContent = '塔を制覇する'; // 通常モードはfinishTowerFloor側でここに来ないための保険
+  }
+  // 無限モードで5階を制覇したあとは、いつでも「ここで終わりにする」ことができる
+  const stopBtn = document.getElementById('towerStopHereBtn');
+  stopBtn.style.display = state.towerInfiniteMode && state.towerFloor >= TOWER_TOTAL_FLOORS ? 'block' : 'none';
   showScreen('tower-floor-clear');
+}
+
+function stopInfiniteTowerRun() {
+  playClick();
+  completeTowerRun(true);
 }
 
 function advanceTowerFloor() {
@@ -400,13 +449,15 @@ function completeTowerRun(cleared) {
   const profile = state.profile;
   const subject = state.towerSubject;
   const difficulty = state.towerDifficulty;
-  const reachedFloor = cleared ? TOWER_TOTAL_FLOORS : state.towerFloor;
+  const reachedFloor = state.towerFloor;
+  // 5階制覇済みかどうか（無限モードで6階以降に追放されても、この実績は取り消さない）
+  const baseCleared = state.towerConquestSynced;
 
   const all = loadTowerProgress(profile);
   if (!all[subject]) all[subject] = { bestFloor: 0, clearedDifficulties: [] };
   const prog = all[subject];
   if (reachedFloor > prog.bestFloor) prog.bestFloor = reachedFloor;
-  if (cleared && !prog.clearedDifficulties.includes(difficulty)) {
+  if (baseCleared && !prog.clearedDifficulties.includes(difficulty)) {
     prog.clearedDifficulties.push(difficulty);
   }
   saveTowerProgress(profile, all);
@@ -424,17 +475,14 @@ function completeTowerRun(cleared) {
     date: `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`,
     timestamp: today.getTime(), // 「直近1週間」の判定に使う生の時刻（門番のコメント用）
     difficulty,
-    cleared,
+    cleared: baseCleared,
     reachedFloor,
     floorResults: state.towerFloorResults.slice(),
   });
   localStorage.setItem(historyKey, JSON.stringify(history.slice(0, 20)));
 
-  // 踏破に成功した場合、クラウド連携が設定されていれば別端末からも
-  // 「直近1週間の踏破者」として見えるよう記録を送信する
-  if (cleared && isCloudConfigured()) {
-    syncTowerConquest(profile, subject, difficulty, reachedFloor);
-  }
+  // 塔踏破そのもののクラウド送信は、5階を制覇した瞬間（finishTowerFloor側）で
+  // 既に1回行っている。無限モードで後から追放されても、その送信は取り消さない。
 
   // バッジ判定（既存のBADGE_DEFS + buildBadgeContextの仕組みに乗せる）
   const newBadges = checkAndAwardBadges(profile);
@@ -448,12 +496,13 @@ function completeTowerRun(cleared) {
 
   if (isCloudConfigured()) {
     // 塔の踏破そのものをタイムラインへ（ハイライトの対象はこちらを優先する）
-    if (cleared) {
+    if (baseCleared) {
+      const infiniteNote = reachedFloor > TOWER_TOTAL_FLOORS ? `（無限モードで${reachedFloor}階まで到達）` : '';
       postFeedEvent(
         profile,
         'tower',
         '文明の塔を制覇！',
-        `${SUBJECT_LABEL[subject]}・${TOWER_DIFFICULTY[difficulty].label}`,
+        `${SUBJECT_LABEL[subject]}・${TOWER_DIFFICULTY[difficulty].label}${infiniteNote}`,
         '🗼',
         id => {
           lastTowerFeedEntryId = id;
@@ -465,7 +514,7 @@ function completeTowerRun(cleared) {
     postBadgeFeedEvents(profile, newBadges);
   }
 
-  renderTowerResultScreen(cleared, newBadges);
+  renderTowerResultScreen(cleared, baseCleared, newBadges);
   showScreen('tower-result');
 }
 
@@ -479,17 +528,23 @@ async function highlightLastTowerFeedEvent(btn) {
   }
 }
 
-function renderTowerResultScreen(cleared, newBadges) {
-  document.getElementById('towerResultEyebrow').textContent = cleared ? 'TOWER CLEARED' : 'TOWER CHALLENGE';
-  document.getElementById('towerResultTitle').textContent = cleared ? '塔を制覇した！' : '塔から追い出された…';
-  document.getElementById('towerResultHanko').textContent = cleared ? '制覇' : '挑戦';
+function renderTowerResultScreen(cleared, baseCleared, newBadges) {
+  const infiniteBeyondFive = state.towerInfiniteMode && state.towerFloor > TOWER_TOTAL_FLOORS;
+  document.getElementById('towerResultEyebrow').textContent = baseCleared ? 'TOWER CLEARED' : 'TOWER CHALLENGE';
+  document.getElementById('towerResultTitle').textContent = baseCleared
+    ? (infiniteBeyondFive || !cleared ? '塔を制覇し、さらに無限モードに挑んだ！' : '塔を制覇した！')
+    : '塔から追い出された…';
+  document.getElementById('towerResultHanko').textContent = baseCleared ? '制覇' : '挑戦';
   document.getElementById('towerResultRank').textContent =
     `${SUBJECT_LABEL[state.towerSubject]}の塔　${TOWER_DIFFICULTY[state.towerDifficulty].label}`;
 
   const totalCorrect = state.towerFloorResults.reduce((s, r) => s + r.correct, 0);
   const totalQuestions = state.towerFloorResults.reduce((s, r) => s + r.total, 0);
+  const floorLine = state.towerFloor > TOWER_TOTAL_FLOORS
+    ? `到達：${state.towerFloor}階（無限モードで全${TOWER_TOTAL_FLOORS}階を突破後、+${state.towerFloor - TOWER_TOTAL_FLOORS}階）`
+    : `到達：${state.towerFloorResults.length}階 / 全${TOWER_TOTAL_FLOORS}階`;
   document.getElementById('towerResultMeta').innerHTML =
-    `到達：${state.towerFloorResults.length}階 / 全${TOWER_TOTAL_FLOORS}階<br>累計 ${totalCorrect} / ${totalQuestions} 問正解`;
+    `${floorLine}<br>累計 ${totalCorrect} / ${totalQuestions} 問正解`;
 
   renderGuildQuestNotice(document.getElementById('towerResultGuildNotice'), state.towerLastGuildCompleted);
 

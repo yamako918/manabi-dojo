@@ -96,7 +96,7 @@ service cloud.firestore {
         && request.resource.data.profile is string
         && request.resource.data.profile.size() > 0
         && request.resource.data.profile.size() <= 20
-        && request.resource.data.kind in ['badge', 'tower', 'arena']
+        && request.resource.data.kind in ['badge', 'tower', 'arena', 'family']
         && request.resource.data.title is string
         && request.resource.data.title.size() <= 100
         && request.resource.data.highlighted == false
@@ -124,6 +124,14 @@ service cloud.firestore {
         && request.resource.data.sentAt == request.time;
 
       allow update, delete: if false;
+    }
+
+    // 家族協力イベント（週ごとの家族合計正解数）。increment()での加算のみ想定。
+    match /familyGoal/{weekKey} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.data.weekKey is string
+        && request.resource.data.totalCorrect is int;
     }
 
     // 上記以外はすべて拒否

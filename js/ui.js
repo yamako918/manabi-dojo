@@ -144,6 +144,7 @@ function showScreen(name) {
   if (name === 'profile') renderProfileList();
   if (name === 'subjects') {
     document.getElementById('profileWelcome').textContent = state.profile || '';
+    renderProfileTitleBadge();
     renderLastRecord();
     renderMascotHome();
     renderWeakButton();
@@ -369,6 +370,13 @@ function getMascotMessage(profile) {
   if (r && r.total > 0 && r.correct === r.total) {
     return { mood: 'happy', text: `前回は${r.category}で全問正解だったね！すごいよ！` };
   }
+  const staleWeakCount = getStaleWeakCount(profile);
+  if (staleWeakCount > 0) {
+    return {
+      mood: 'normal',
+      text: `少し前に間違えた問題が${staleWeakCount}問、まだ残ってるよ。時間があるときに見直してみよう。`,
+    };
+  }
   const milestone = findNearestMilestone(profile);
   if (milestone) return { mood: 'normal', text: milestone };
 
@@ -500,6 +508,68 @@ function removeFromWeakList(profile, catId, qHTML) {
   }
 }
 
+// 復習リマインダー用：指定日数以上見直していない（最終誤答から日数が経った）苦手問題の件数を返す
+function getStaleWeakCount(profile, days = 3) {
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  const list = loadWeakList(profile);
+  return list.filter(item => typeof item.lastMissed === 'number' && item.lastMissed <= cutoff).length;
+}
+
+/* ---------- 家族協力イベント（週替わりの家族合計正解数） ---------- */
+const FAMILY_WEEKLY_GOAL = 200;
+
+// 目標到達をこの週すでに知らせたかどうかを、家族で共有せずローカルにだけ覚えておく
+// （誰か1人が知らせれば十分で、全端末が同時に投稿する必要はないため）。
+function hasAnnouncedFamilyGoalThisWeek(weekKey) {
+  return localStorage.getItem('kd-family-goal-announced') === weekKey;
+}
+function markFamilyGoalAnnounced(weekKey) {
+  localStorage.setItem('kd-family-goal-announced', weekKey);
+}
+
+function progressFamilyWeeklyGoal(correctCount) {
+  const weekKey = guildWeekKey(); // ギルドと同じ週境界を流用する
+  incrementFamilyWeeklyGoal(weekKey, correctCount).then(async ok => {
+    if (!ok) return;
+    if (hasAnnouncedFamilyGoalThisWeek(weekKey)) return;
+    const goal = await loadFamilyWeeklyGoal(weekKey);
+    if (goal && goal.totalCorrect >= FAMILY_WEEKLY_GOAL) {
+      markFamilyGoalAnnounced(weekKey);
+      postFeedEvent(
+        '家族のみんな',
+        'family',
+        '今週の家族目標を達成しました！',
+        `合計${goal.totalCorrect}問正解（目標${FAMILY_WEEKLY_GOAL}問）`,
+        '🏠'
+      );
+    }
+  });
+}
+
+
+const TITLE_TIERS = [
+  { min: 0, title: '新米冒険者' },
+  { min: 5, title: '見習い冒険者' },
+  { min: 10, title: '一人前の冒険者' },
+  { min: 20, title: 'ベテラン冒険者' },
+  { min: 30, title: '伝説の冒険者' },
+];
+
+function getProfileTitle(profile) {
+  const count = loadBadges(profile).length;
+  let title = TITLE_TIERS[0].title;
+  TITLE_TIERS.forEach(t => {
+    if (count >= t.min) title = t.title;
+  });
+  return title;
+}
+
+function renderProfileTitleBadge() {
+  const el = document.getElementById('profileTitleBadge');
+  if (!el || !state.profile) return;
+  el.textContent = `（${getProfileTitle(state.profile)}）`;
+}
+
 /* ---------- 実績バッジ ---------- */
 const BADGE_DEFS = [
   { id: 'first_quiz', name: 'はじめの一歩', desc: 'はじめてクイズに挑戦した', icon: '🥉',
@@ -566,6 +636,8 @@ const BADGE_DEFS = [
   // ランキング画面を開いた瞬間に guild.js の awardBadgeDirect() から個別に付与される。
   { id: 'guild_rank_1', name: 'ギルド週間ランキング1位', desc: '週が終了し、確定した最終結果でウィークリーのギルドポイントランキング1位だった', icon: '🥇',
     check: () => false },
+  { id: 'tower_infinite_10', name: '無限の踏破者', desc: '文明の塔の無限モードで10階以上に到達した', icon: '🌀',
+    check: ctx => ctx.towerMaxBestFloor >= 10 },
 ];
 
 
@@ -598,12 +670,14 @@ function buildBadgeContext(profile) {
   const towerClearedDifficulties = new Set();
   let towerAnyClearedSubjects = 0;
   let towerAllDifficultySubjects = 0;
+  let towerMaxBestFloor = 0;
   const towerDifficultyCount = Object.keys(TOWER_DIFFICULTY).length;
   Object.values(towerProgress).forEach(p => {
     const cleared = p.clearedDifficulties || [];
     cleared.forEach(d => towerClearedDifficulties.add(d));
     if (cleared.length > 0) towerAnyClearedSubjects++;
     if (cleared.length >= towerDifficultyCount) towerAllDifficultySubjects++;
+    if ((p.bestFloor || 0) > towerMaxBestFloor) towerMaxBestFloor = p.bestFloor || 0;
   });
 
   const totalPlayDays = loadPlayDays(profile).length;
@@ -623,7 +697,7 @@ function buildBadgeContext(profile) {
   return {
     hasLastRecord, streakCount: streak.count, perfectCount, totalCorrect,
     subjectsPlayed: subjectsSeen.size, weakCleared, towerClearedDifficulties,
-    totalPlayDays, towerAnyClearedSubjects, towerAllDifficultySubjects,
+    totalPlayDays, towerAnyClearedSubjects, towerAllDifficultySubjects, towerMaxBestFloor,
     fullPentagonGrade, hourOfCompletion,
     guildRegistered: !!guildLicense,
     guildQuestsCompleted: guildProgress.totalQuestsCompleted,
@@ -1361,6 +1435,11 @@ function finishQuiz() {
 
     // 連続プレイ日数の更新（通常モードの1セッション完了のみでカウント）
     updateStreak(state.profile);
+
+    // 家族協力イベント：家族全員（別端末含む）の今週の合計正解数に加算する
+    if (isCloudConfigured() && state.correctCount > 0) {
+      progressFamilyWeeklyGoal(state.correctCount);
+    }
   }
 
   // クラウド連携が設定されていれば、みんなの記録へ送信する（未設定なら何もしない）
@@ -1466,6 +1545,18 @@ function renderLastRecord() {
 /* ---------- 初期化 ---------- */
 renderProfileList();
 
+// クラウド未送信分の再送キューを、起動時とオンライン復帰時にまとめて試す
+if (typeof isCloudConfigured === 'function' && isCloudConfigured()) {
+  flushSyncRetryQueue();
+}
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('online', () => {
+    if (typeof isCloudConfigured === 'function' && isCloudConfigured()) {
+      flushSyncRetryQueue();
+    }
+  });
+}
+
 /* ---------- PWA更新の検知・反映 ----------
    GitHub Pagesはsw.js自体にキャッシュ無効化のHTTPヘッダーを付けられないため、
    特にiOSのSafari（ホーム画面追加時）で更新に気づきにくいことがある。
@@ -1549,11 +1640,28 @@ async function renderFamilyFeedDigest() {
 async function renderFamilyFeedScreen() {
   const notice = document.getElementById('familyFeedNotice');
   const wrap = document.getElementById('familyFeedList');
+  const goalCard = document.getElementById('familyGoalCard');
   if (!isCloudConfigured()) {
     notice.style.display = 'block';
     notice.textContent = 'クラウド連携がまだ設定されていないため、できごとタイムラインは表示できません。';
     wrap.innerHTML = '';
+    goalCard.style.display = 'none';
     return;
+  }
+
+  const weekKey = guildWeekKey();
+  const goal = await loadFamilyWeeklyGoal(weekKey);
+  if (goal) {
+    const total = goal.totalCorrect || 0;
+    const pct = Math.min(Math.round((total / FAMILY_WEEKLY_GOAL) * 100), 100);
+    goalCard.style.display = 'block';
+    goalCard.innerHTML = `
+      <div class="kanji">協</div>
+      <h2>今週の家族協力目標</h2>
+      <p>合計 ${total} / ${FAMILY_WEEKLY_GOAL} 問正解（${pct}%）${total >= FAMILY_WEEKLY_GOAL ? '　🎉達成！' : ''}</p>
+    `;
+  } else {
+    goalCard.style.display = 'none';
   }
   notice.style.display = 'none';
   wrap.innerHTML = `<div class="footnote" style="padding:14px 0;">読み込み中…</div>`;

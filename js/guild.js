@@ -31,6 +31,8 @@ const GUILD_RANKS = {
 const GUILD_RANK_ORDER = ['elem', 'jhs1', 'jhs2', 'jhs3', 'highschool'];
 
 const GUILD_QUEST_POINTS = { subject_clear: 10, perfect_clear: 20, correct_count: 10, weak_review: 15, tower_floor: 25 };
+const GUILD_WEEKLY_QUEST_POINTS = 50;
+const GUILD_WEEKLY_QUEST_LABEL = '5教科すべてで1単元ずつクリアする';
 
 /* ---------- 週の境界計算 ---------- */
 const GUILD_WEEK_ANCHOR_MS = new Date(2024, 0, 7, 8, 0, 0, 0).getTime(); // 2024-01-07は日曜日
@@ -202,6 +204,60 @@ function questMatchesEvent(q, ev) {
   return false;
 }
 
+/* ---------- 週替わり特別依頼（毎日の3件とは別に、週1件だけの大型依頼） ---------- */
+// 日替わり依頼と同じ週境界（guildWeekKey）でリセットする。
+function loadGuildWeeklyQuest(profile) {
+  const wk = guildWeekKey();
+  let data;
+  try {
+    data = JSON.parse(localStorage.getItem(`kd-guild-weeklyquest-${profile}`));
+  } catch (e) {
+    data = null;
+  }
+  if (!data || data.weekKey !== wk) {
+    data = { weekKey: wk, subjectsCleared: [], completed: false };
+    localStorage.setItem(`kd-guild-weeklyquest-${profile}`, JSON.stringify(data));
+  }
+  return data;
+}
+function saveGuildWeeklyQuest(profile, data) {
+  localStorage.setItem(`kd-guild-weeklyquest-${profile}`, JSON.stringify(data));
+}
+
+// 通常クイズ（mode:'normal'）の単元クリアのたびに呼ぶ。5教科すべてがそろったら
+// 報酬を付与し、日替わり依頼と同じ形の通知オブジェクトを返す（達成していなければnull）。
+function progressGuildWeeklyQuest(profile, eventInfo) {
+  if (!isGuildRegistered(profile)) return null;
+  if (!(eventInfo.kind === 'quiz' && eventInfo.mode === 'normal' && eventInfo.subject)) return null;
+
+  const data = loadGuildWeeklyQuest(profile);
+  if (data.completed) return null;
+  if (!data.subjectsCleared.includes(eventInfo.subject)) {
+    data.subjectsCleared.push(eventInfo.subject);
+  }
+
+  if (data.subjectsCleared.length < SUBJECT_ORDER.length) {
+    saveGuildWeeklyQuest(profile, data);
+    return null;
+  }
+
+  data.completed = true;
+  saveGuildWeeklyQuest(profile, data);
+
+  const progress = loadGuildProgress(profile);
+  progress.totalQuestsCompleted += 1;
+  progress.totalPointsAllTime += GUILD_WEEKLY_QUEST_POINTS;
+  saveGuildProgress(profile, progress);
+
+  const weekData = addGuildWeekPoints(profile, GUILD_WEEKLY_QUEST_POINTS);
+  if (isCloudConfigured() && weekData) {
+    const license = loadGuildLicense(profile);
+    syncGuildWeeklyPoints(profile, license.rankId, weekData.weekKey, weekData.points);
+  }
+
+  return { label: `週替わり依頼「${GUILD_WEEKLY_QUEST_LABEL}」`, points: GUILD_WEEKLY_QUEST_POINTS };
+}
+
 function evaluateGuildQuests(profile, eventInfo) {
   if (!isGuildRegistered(profile)) return [];
   const data = loadGuildDailyQuests(profile);
@@ -231,7 +287,13 @@ function evaluateGuildQuests(profile, eventInfo) {
       const license = loadGuildLicense(profile);
       syncGuildWeeklyPoints(profile, license.rankId, weekData.weekKey, weekData.points);
     }
+  }
 
+  // 週替わり特別依頼も同時に判定する（日替わり依頼の達成有無に関わらずチェックする）
+  const weeklyResult = progressGuildWeeklyQuest(profile, eventInfo);
+  if (weeklyResult) newlyCompleted.push(weeklyResult);
+
+  if (newlyCompleted.length > 0) {
     playGuildQuestCoin(); // 依頼達成のコイン獲得音
     const newBadges = checkAndAwardBadges(profile);
     if (newBadges.length > 0) playBadgeGet();
@@ -414,6 +476,19 @@ function renderGuildScreen() {
   const noticeEl = document.getElementById('guildQuestNotice');
   noticeEl.style.display = 'none';
   noticeEl.innerHTML = '';
+
+  const weeklyQuest = loadGuildWeeklyQuest(state.profile);
+  const weeklyList = document.getElementById('guildWeeklyQuestList');
+  weeklyList.innerHTML = '';
+  const weeklyDiv = document.createElement('div');
+  weeklyDiv.className = 'cat-card';
+  weeklyDiv.innerHTML = `
+    <div class="cat-body">
+      <h3>${weeklyQuest.completed ? '✅ ' : '🎯 '}${GUILD_WEEKLY_QUEST_LABEL}</h3>
+      <span>進捗：${weeklyQuest.subjectsCleared.length}/${SUBJECT_ORDER.length}科目・報酬：${GUILD_WEEKLY_QUEST_POINTS}pt${weeklyQuest.completed ? '（達成済み）' : '（未達成）'}</span>
+    </div>
+  `;
+  weeklyList.appendChild(weeklyDiv);
 
   const quests = loadGuildDailyQuests(state.profile).quests;
   const list = document.getElementById('guildQuestList');
