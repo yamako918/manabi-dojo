@@ -521,7 +521,7 @@ function completeTowerRun(cleared) {
 async function highlightLastTowerFeedEvent(btn) {
   playClick();
   if (!lastTowerFeedEntryId) return;
-  const ok = await highlightFeedEvent(lastTowerFeedEntryId);
+  const ok = await highlightFeedEvent(lastTowerFeedEntryId, state.profile);
   if (ok) {
     btn.textContent = '⭐ ハイライトしました';
     btn.disabled = true;

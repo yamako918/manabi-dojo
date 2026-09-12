@@ -452,6 +452,15 @@ function loadPlayDays(profile) {
   }
 }
 
+// クラウド側で把握している累計プレイ日数（別端末分を含む）のキャッシュ値。
+// 非同期にしか取得できないため、buildBadgeContext()は同期のままこのキャッシュを読む。
+function loadCloudPlayDaysCache(profile) {
+  return parseInt(localStorage.getItem(`kd-playdays-cloudcount-${profile}`) || '0', 10);
+}
+function saveCloudPlayDaysCache(profile, count) {
+  localStorage.setItem(`kd-playdays-cloudcount-${profile}`, String(count));
+}
+
 // クイズ（通常・復習・にがて克服・文明の塔いずれも）が1回終わるたびに呼ぶ。
 // 同じ日に何度呼んでも重複加算されない。
 function recordPlayDay(profile) {
@@ -460,6 +469,25 @@ function recordPlayDay(profile) {
   if (!days.includes(today)) {
     days.push(today);
     localStorage.setItem(`kd-playdays-${profile}`, JSON.stringify(days));
+  }
+
+  // クラウド連携が設定されていれば、別端末分も合わせた累計日数を非同期で取得し直す。
+  // このタイミングの呼び出し元（finishQuiz等）は既に一度バッジ判定を終えているため、
+  // 別端末分の日数が反映されて初めて条件を満たすケースを取りこぼさないよう、
+  // ここでもう一度バッジ判定を行う。
+  if (isCloudConfigured()) {
+    syncPlayDay(profile, today).then(cloudCount => {
+      if (typeof cloudCount !== 'number') return;
+      const prevCache = loadCloudPlayDaysCache(profile);
+      saveCloudPlayDaysCache(profile, cloudCount);
+      if (cloudCount > prevCache) {
+        const newBadges = checkAndAwardBadges(profile);
+        if (newBadges.length > 0) {
+          playBadgeGet();
+          postBadgeFeedEvents(profile, newBadges);
+        }
+      }
+    });
   }
 }
 
@@ -680,7 +708,9 @@ function buildBadgeContext(profile) {
     if ((p.bestFloor || 0) > towerMaxBestFloor) towerMaxBestFloor = p.bestFloor || 0;
   });
 
-  const totalPlayDays = loadPlayDays(profile).length;
+  // 別端末分も合わせたクラウド側の累計日数（非同期で更新されるキャッシュ）と、
+  // この端末だけのローカル日数の大きい方を採用する（クラウド未同期でも安全に動作する）。
+  const totalPlayDays = Math.max(loadPlayDays(profile).length, loadCloudPlayDaysCache(profile));
 
   // いずれかの学年で5教科すべてが三段（達成率100%）＝レーダーチャートが正五角形になったか
   let fullPentagonGrade = false;
@@ -1613,7 +1643,7 @@ let lastQuizFeedEntryId = null; // 直近の通常クイズ結果画面で投稿
 async function highlightLastQuizFeedEvent(btn) {
   playClick();
   if (!lastQuizFeedEntryId) return;
-  const ok = await highlightFeedEvent(lastQuizFeedEntryId);
+  const ok = await highlightFeedEvent(lastQuizFeedEntryId, state.profile);
   if (ok) {
     btn.textContent = '⭐ ハイライトしました';
     btn.disabled = true;

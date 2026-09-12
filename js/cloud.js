@@ -333,6 +333,38 @@ async function loadTowerMonument() {
 }
 
 /* ============================================================
+   累計プレイ日数のクラウド同期
+   ------------------------------------------------------------
+   累計プレイ日数（kd-playdays-*）はもともと端末のlocalStorageのみで
+   管理していたため、家族が複数端末で同じプロフィール名を使って遊ぶと、
+   各端末ではその端末で遊んだ日数しかカウントされず、「累計10日プレイ」
+   のようなバッジが実際には達成しているのに取得できない不具合があった。
+   ドキュメントに日付の配列をarrayUnionで追加していくことで、
+   どの端末からアクセスしても同じ集合に安全にマージできるようにする。
+   ============================================================ */
+async function syncPlayDay(profile, dateStr) {
+  const ok = await initCloud();
+  if (!ok) return null;
+  try {
+    const docRef = cloudDb.collection('profilePlayDays').doc(profile);
+    await docRef.set(
+      {
+        name: profile,
+        dates: firebase.firestore.FieldValue.arrayUnion(dateStr)
+      },
+      { merge: true }
+    );
+    const snap = await docRef.get();
+    const dates = (snap.exists && snap.data().dates) || [];
+    return dates.length;
+  } catch (e) {
+    console.warn('累計プレイ日数の同期に失敗しました:', e);
+    return null;
+  }
+}
+
+
+/* ============================================================
    できごとタイムライン（家族のみんなのできごとを自動で共有する）
    ・バッジ獲得・文明の塔の踏破・闘技場の自己ベスト更新を自動投稿する
    ・投稿した本人はあとから1件だけ「ハイライト」でき、
@@ -408,10 +440,20 @@ async function loadLatestFeedEntry() {
 }
 
 // 自分の投稿を1件ハイライトする（一方向のみ、解除は用意しない）
-async function highlightFeedEvent(entryId) {
+// 自分の投稿を1件だけハイライトする。
+// 同じプロフィールが過去にハイライトした別のできごとが残っていると
+// 「1ユーザーあたり最新1件のみ」という想定が崩れるため、新しくハイライトする前に
+// 同じプロフィールの既存のハイライトをすべて解除してから切り替える。
+async function highlightFeedEvent(entryId, profile) {
   const ok = await initCloud();
   if (!ok || !entryId) return false;
   try {
+    if (profile) {
+      // where を1つだけにして複合インデックスを不要にし、highlightedの判定はJS側で行う
+      const snap = await cloudDb.collection('familyFeed').where('profile', '==', profile).limit(50).get();
+      const toClear = snap.docs.filter(doc => doc.id !== entryId && doc.data().highlighted === true);
+      await Promise.all(toClear.map(doc => doc.ref.update({ highlighted: false })));
+    }
     await cloudDb.collection('familyFeed').doc(entryId).update({ highlighted: true });
     return true;
   } catch (e) {

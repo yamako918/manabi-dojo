@@ -340,7 +340,7 @@ function finishArenaRound(reason) {
 async function highlightLastArenaFeedEvent(btn) {
   playClick();
   if (!lastArenaFeedEntryId) return;
-  const ok = await highlightFeedEvent(lastArenaFeedEntryId);
+  const ok = await highlightFeedEvent(lastArenaFeedEntryId, state.profile);
   if (ok) {
     btn.textContent = '⭐ ハイライトしました';
     btn.disabled = true;

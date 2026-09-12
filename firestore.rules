@@ -103,9 +103,11 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time;
 
       // ハイライトのON操作のみ許可し、それ以外のフィールドの改ざんは防ぐ
+      // highlightedフィールドの変更のみ許可する（true/falseどちらへの変更も可、
+      // 新しいハイライトに切り替える際に古いハイライトを解除する必要があるため）。
+      // それ以外のフィールドの改ざんは防ぐ。
       allow update: if request.auth != null
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['highlighted'])
-        && request.resource.data.highlighted == true;
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['highlighted']);
 
       allow delete: if false;
     }
@@ -132,6 +134,15 @@ service cloud.firestore {
       allow write: if request.auth != null
         && request.resource.data.weekKey is string
         && request.resource.data.totalCorrect is int;
+    }
+
+    // 累計プレイ日数（別端末分もまとめて把握するための日付リスト）
+    match /profilePlayDays/{profileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.data.name == profileName
+        && request.resource.data.name is string
+        && request.resource.data.dates is list;
     }
 
     // 上記以外はすべて拒否
