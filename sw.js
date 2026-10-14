@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'manabi-dojo-v39';
+﻿const CACHE_NAME = 'manabi-dojo-v41';
 const ASSETS = [
   './',
   './index.html',
@@ -17,6 +17,7 @@ const ASSETS = [
   './js/arena.js',
   './js/firebase-config.js',
   './js/cloud.js',
+  './js/sync.js',
   './js/ui.js'
 ];
 

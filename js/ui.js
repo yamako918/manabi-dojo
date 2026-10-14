@@ -38,11 +38,15 @@ function saveProfiles(list) {
 function renderProfileList() {
   const wrap = document.getElementById('profileList');
   wrap.innerHTML = '';
+  const restoreBtn = document.getElementById('cloudRestoreBtn');
+  if (restoreBtn) restoreBtn.style.display = isCloudConfigured() ? 'block' : 'none';
   const profiles = getProfiles();
   if (profiles.length === 0) {
     const p = document.createElement('div');
     p.className = 'profile-empty';
-    p.textContent = 'まだプロフィールがありません。下のボタンから作成してください。';
+    p.textContent = isCloudConfigured()
+      ? 'まだプロフィールがありません。新しく作成するか、「クラウドから復元」で以前の記録を呼び戻せます。'
+      : 'まだプロフィールがありません。下のボタンから作成してください。';
     wrap.appendChild(p);
     return;
   }
@@ -96,6 +100,10 @@ function createProfile() {
   const input = document.getElementById('newProfileName');
   const name = input.value.trim();
   if (!name) return;
+  if (name.includes('/')) {
+    alert('名前に「/」は使えません。');
+    return;
+  }
   const profiles = getProfiles();
   if (profiles.includes(name)) {
     alert('同じ名前のプロフィールがすでにあります。別の名前にしてください。');
@@ -113,26 +121,23 @@ function createProfile() {
   selectProfile(name);
 }
 
-function deleteProfile(name) {
-  if (!confirm(`「${name}」のプロフィールを削除しますか？記録もすべて消えます。`))
+async function deleteProfile(name) {
+  const cloudNote = isCloudConfigured() ? 'クラウド上の記録も削除され、他の端末からも復元できなくなります。' : '';
+  if (!confirm(`「${name}」のプロフィールを削除しますか？記録もすべて消えます。${cloudNote}`))
     return;
   playClick();
+  removeLocalProfileData(name); // プロフィール一覧から外す前に、同期対象キーをすべて消す
   saveProfiles(getProfiles().filter(n => n !== name));
-  localStorage.removeItem(`kd-last-record-${name}`);
-  localStorage.removeItem(`kd-weak-${name}`);
-  localStorage.removeItem(`kd-streak-${name}`);
-  localStorage.removeItem(`kd-weak-cleared-${name}`);
-  localStorage.removeItem(`kd-badges-${name}`);
-  Object.keys(localStorage).forEach(k => {
-    if (k.startsWith(`kd-best-${name}-`) || k.startsWith(`kd-stats-${name}-`)) localStorage.removeItem(k);
-  });
   renderProfileList();
+  await deleteProfileCloud(name);
 }
 
-function selectProfile(name) {
+async function selectProfile(name) {
   playClick();
   state.profile = name;
   fieldOutsideActive = false; // 別プロフィールの前回の表示状態を引き継がないようにする
+  // クラウドの記録をこの端末へ取り込む（未設定・失敗・タイムアウト時はローカルのまま進む）
+  await syncProfileOnSelect(name);
   showScreen('subjects');
 }
 
@@ -417,7 +422,7 @@ function updateStreak(profile) {
   const today = todayDateStr();
   if (streak.lastDate === today) {
     streak.justExtendedToday = false; // 今日はすでに反映済み
-    localStorage.setItem(`kd-streak-${profile}`, JSON.stringify(streak));
+    kdSet(`kd-streak-${profile}`, JSON.stringify(streak));
     return streak;
   }
   if (streak.lastDate === dateStrDaysAgo(1)) {
@@ -427,7 +432,7 @@ function updateStreak(profile) {
   }
   streak.lastDate = today;
   streak.justExtendedToday = true;
-  localStorage.setItem(`kd-streak-${profile}`, JSON.stringify(streak));
+  kdSet(`kd-streak-${profile}`, JSON.stringify(streak));
   return streak;
 }
 
@@ -468,7 +473,7 @@ function recordPlayDay(profile) {
   const today = todayDateStr();
   if (!days.includes(today)) {
     days.push(today);
-    localStorage.setItem(`kd-playdays-${profile}`, JSON.stringify(days));
+    kdSet(`kd-playdays-${profile}`, JSON.stringify(days));
   }
 
   // クラウド連携が設定されていれば、別端末分も合わせた累計日数を非同期で取得し直す。
@@ -502,7 +507,7 @@ function loadWeakList(profile) {
   }
 }
 function saveWeakList(profile, list) {
-  localStorage.setItem(`kd-weak-${profile}`, JSON.stringify(list));
+  kdSet(`kd-weak-${profile}`, JSON.stringify(list));
 }
 function addToWeakList(profile, catId, catName, q) {
   if (q.type !== 'choice') return;
@@ -532,7 +537,8 @@ function removeFromWeakList(profile, catId, qHTML) {
     saveWeakList(profile, next);
     const key = `kd-weak-cleared-${profile}`;
     const count = parseInt(localStorage.getItem(key) || '0', 10) + 1;
-    localStorage.setItem(key, String(count));
+    kdSet(key, String(count));
+    addWeakTombstone(profile, catId, qHTML); // 他端末の古い苦手リストから復活しないようにする
   }
 }
 
@@ -674,7 +680,7 @@ function loadBadges(profile) {
   catch (e) { return []; }
 }
 function saveBadges(profile, list) {
-  localStorage.setItem(`kd-badges-${profile}`, JSON.stringify(list));
+  kdSet(`kd-badges-${profile}`, JSON.stringify(list));
 }
 
 function buildBadgeContext(profile) {
@@ -1448,7 +1454,7 @@ function finishQuiz() {
 
   if (isScored) {
     const prevBest = parseInt(localStorage.getItem(`kd-best-${state.profile}-${state.catId}`) || '-1');
-    if (rankIdx > prevBest) localStorage.setItem(`kd-best-${state.profile}-${state.catId}`, rankIdx);
+    if (rankIdx > prevBest) kdSet(`kd-best-${state.profile}-${state.catId}`, rankIdx);
 
     // 単元ごとの累計正解数・挑戦数を記録
     const statsKey = `kd-stats-${state.profile}-${state.catId}`;
@@ -1461,7 +1467,7 @@ function finishQuiz() {
     stats.attempted = (stats.attempted || 0) + state.total;
     stats.correct = (stats.correct || 0) + state.correctCount;
     stats.sessions = (stats.sessions || 0) + 1;
-    localStorage.setItem(statsKey, JSON.stringify(stats));
+    kdSet(statsKey, JSON.stringify(stats));
 
     // 連続プレイ日数の更新（通常モードの1セッション完了のみでカウント）
     updateStreak(state.profile);
@@ -1480,7 +1486,7 @@ function finishQuiz() {
   const today = new Date();
   const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
 
-  localStorage.setItem(
+  kdSet(
     `kd-last-record-${state.profile}`,
     JSON.stringify({
       date: dateStr,
@@ -1578,12 +1584,20 @@ renderProfileList();
 // クラウド未送信分の再送キューを、起動時とオンライン復帰時にまとめて試す
 if (typeof isCloudConfigured === 'function' && isCloudConfigured()) {
   flushSyncRetryQueue();
+  flushPendingProfileSyncs();
 }
 if (typeof window !== 'undefined' && window.addEventListener) {
   window.addEventListener('online', () => {
     if (typeof isCloudConfigured === 'function' && isCloudConfigured()) {
       flushSyncRetryQueue();
+      flushPendingProfileSyncs();
     }
+  });
+}
+// 画面を閉じる・アプリを離れるときは、デバウンス待ちの同期を即座に実行する
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushPendingProfileSyncs(true);
   });
 }
 

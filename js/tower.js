@@ -58,7 +58,7 @@ function loadTowerProgress(profile) {
   }
 }
 function saveTowerProgress(profile, data) {
-  localStorage.setItem(`kd-tower-${profile}`, JSON.stringify(data));
+  kdSet(`kd-tower-${profile}`, JSON.stringify(data));
 }
 function getTowerSubjectProgress(profile, subject) {
   const all = loadTowerProgress(profile);
@@ -479,7 +479,7 @@ function completeTowerRun(cleared) {
     reachedFloor,
     floorResults: state.towerFloorResults.slice(),
   });
-  localStorage.setItem(historyKey, JSON.stringify(history.slice(0, 20)));
+  kdSet(historyKey, JSON.stringify(history.slice(0, 20)));
 
   // 塔踏破そのもののクラウド送信は、5階を制覇した瞬間（finishTowerFloor側）で
   // 既に1回行っている。無限モードで後から追放されても、その送信は取り消さない。

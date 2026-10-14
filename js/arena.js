@@ -61,7 +61,7 @@ function loadArenaLocalBest(profile) {
   }
 }
 function saveArenaLocalBest(profile, data) {
-  localStorage.setItem(`kd-arena-best-${profile}`, JSON.stringify(data));
+  kdSet(`kd-arena-best-${profile}`, JSON.stringify(data));
 }
 // 新記録なら保存して true を返す
 function updateArenaLocalBest(profile, timeLimitKey, correctCount, subject, grade) {

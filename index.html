@@ -377,6 +377,9 @@
       <button class="btn btn-primary" style="padding:9px 16px;font-size:14px;" onclick="createProfile()">作成</button>
     </div>
     <button class="btn btn-outline" onclick="toggleAddProfile()">＋ 新しいプロフィール</button>
+    <button class="btn btn-outline" id="cloudRestoreBtn" style="display:none;" onclick="toggleCloudRestore()">☁️ クラウドから復元</button>
+    <div class="cat-list" id="cloudRestoreList" style="display:none;"></div>
+    <div class="footnote" id="profileSyncStatus"></div>
     <div class="footnote">プロフィールごとに記録が保存されます（最大8人まで）</div>
   </div>
 
@@ -748,6 +751,7 @@
 <script src="js/arena.js"></script>
 <script src="js/firebase-config.js"></script>
 <script src="js/cloud.js"></script>
+<script src="js/sync.js"></script>
 <script src="js/ui.js"></script>
 
 </body>

@@ -59,7 +59,7 @@ function loadGuildLicense(profile) {
   }
 }
 function saveGuildLicense(profile, license) {
-  localStorage.setItem(`kd-guild-license-${profile}`, JSON.stringify(license));
+  kdSet(`kd-guild-license-${profile}`, JSON.stringify(license));
 }
 function isGuildRegistered(profile) {
   return !!loadGuildLicense(profile);
@@ -85,7 +85,7 @@ function loadGuildProgress(profile) {
   }
 }
 function saveGuildProgress(profile, progress) {
-  localStorage.setItem(`kd-guild-progress-${profile}`, JSON.stringify(progress));
+  kdSet(`kd-guild-progress-${profile}`, JSON.stringify(progress));
 }
 
 /* ---------- 週間ギルドポイント（週が変わったら自動的に0にリセット） ---------- */
@@ -99,14 +99,14 @@ function loadGuildWeekPoints(profile) {
   }
   if (!data || data.weekKey !== wk) {
     data = { weekKey: wk, points: 0 };
-    localStorage.setItem(`kd-guild-weekpoints-${profile}`, JSON.stringify(data));
+    kdSet(`kd-guild-weekpoints-${profile}`, JSON.stringify(data));
   }
   return data;
 }
 function addGuildWeekPoints(profile, amount) {
   const data = loadGuildWeekPoints(profile); // 週替わりの繰り上げも兼ねる
   data.points += amount;
-  localStorage.setItem(`kd-guild-weekpoints-${profile}`, JSON.stringify(data));
+  kdSet(`kd-guild-weekpoints-${profile}`, JSON.stringify(data));
   return data;
 }
 
@@ -154,12 +154,12 @@ function loadGuildDailyQuests(profile) {
   }
   if (!data || data.date !== today) {
     data = { date: today, quests: generateGuildDailyQuests(profile) };
-    localStorage.setItem(`kd-guild-quests-${profile}`, JSON.stringify(data));
+    kdSet(`kd-guild-quests-${profile}`, JSON.stringify(data));
   }
   return data;
 }
 function saveGuildDailyQuests(profile, data) {
-  localStorage.setItem(`kd-guild-quests-${profile}`, JSON.stringify(data));
+  kdSet(`kd-guild-quests-${profile}`, JSON.stringify(data));
 }
 
 // ランク変更時に呼び出す。本日すでに達成済みの依頼（報酬・累計は加算済み）は
@@ -216,12 +216,12 @@ function loadGuildWeeklyQuest(profile) {
   }
   if (!data || data.weekKey !== wk) {
     data = { weekKey: wk, subjectsCleared: [], completed: false };
-    localStorage.setItem(`kd-guild-weeklyquest-${profile}`, JSON.stringify(data));
+    kdSet(`kd-guild-weeklyquest-${profile}`, JSON.stringify(data));
   }
   return data;
 }
 function saveGuildWeeklyQuest(profile, data) {
-  localStorage.setItem(`kd-guild-weeklyquest-${profile}`, JSON.stringify(data));
+  kdSet(`kd-guild-weeklyquest-${profile}`, JSON.stringify(data));
 }
 
 // 通常クイズ（mode:'normal'）の単元クリアのたびに呼ぶ。5教科すべてがそろったら

@@ -109,12 +109,21 @@ async function syncLeaderboard(profile) {
   try {
     const ctx = buildBadgeContext(profile);
     const streak = loadStreak(profile);
+    // 端末のlocalStorageが消えた直後などに、クラウド上の累計値を小さい値で上書きしないよう、
+    // 単調増加する項目は既存値との大きい方を送る
+    let prev = {};
+    try {
+      const snap = await cloudDb.collection('leaderboard').doc(profile).get();
+      if (snap.exists) prev = snap.data();
+    } catch (e) {
+      prev = {};
+    }
     await cloudDb.collection('leaderboard').doc(profile).set({
       name: profile,
       streakCount: streak.count || 0,
-      perfectCount: ctx.perfectCount || 0,
-      totalCorrect: ctx.totalCorrect || 0,
-      badgeCount: loadBadges(profile).length,
+      perfectCount: Math.max(ctx.perfectCount || 0, prev.perfectCount || 0),
+      totalCorrect: Math.max(ctx.totalCorrect || 0, prev.totalCorrect || 0),
+      badgeCount: Math.max(loadBadges(profile).length, prev.badgeCount || 0),
       lastActive: firebase.firestore.FieldValue.serverTimestamp()
     });
     return true;
